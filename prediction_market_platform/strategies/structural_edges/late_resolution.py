@@ -104,8 +104,12 @@ RECOMMENDED: This is a statistical edge. Trade many markets, size small.
 from typing import Optional, List
 from datetime import datetime
 
-from ..base import Strategy, StrategyConfig, StrategyResult, SignalDirection
-from ...engine.data_ingestion.models import (
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+
+from strategies.base import Strategy, StrategyConfig, StrategyResult, SignalDirection
+from engine.data_ingestion.models import (
     MarketSnapshot, OrderBook, PriceHistory, MarketStatus
 )
 

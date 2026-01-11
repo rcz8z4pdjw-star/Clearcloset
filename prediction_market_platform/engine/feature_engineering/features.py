@@ -15,10 +15,14 @@ from datetime import datetime, timedelta
 from typing import List, Dict, Any, Optional, Tuple
 import math
 
-from ..data_ingestion.models import (
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+
+from engine.data_ingestion.models import (
     MarketSnapshot, OrderBook, PriceHistory, MarketSource
 )
-from ...utils.helpers import (
+from utils.helpers import (
     moving_average, exponential_moving_average, z_score,
     calculate_volatility, percentile_rank
 )

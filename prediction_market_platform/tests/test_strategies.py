@@ -31,7 +31,7 @@ from strategies.behavioral_edges import (
     FavoriteLongshotBiasStrategy,
     OverreactionStrategy,
     HerdingStrategy,
-    AnchoringStrategy
+    AnchoringBiasStrategy
 )
 
 
@@ -46,6 +46,8 @@ class TestLiquidityVacuumStrategy(unittest.TestCase):
         snapshot = MarketSnapshot(
             market_id="test-123",
             source=MarketSource.POLYMARKET,
+            description="Test description",
+            category="politics",
             question="Test market?",
             yes_price=0.50,
             no_price=0.50,
@@ -68,6 +70,8 @@ class TestLiquidityVacuumStrategy(unittest.TestCase):
         snapshot = MarketSnapshot(
             market_id="test-123",
             source=MarketSource.POLYMARKET,
+            description="Test description",
+            category="politics",
             question="Test market?",
             yes_price=0.50,
             no_price=0.50,
@@ -104,6 +108,8 @@ class TestSpreadExploitationStrategy(unittest.TestCase):
         snapshot = MarketSnapshot(
             market_id="test-123",
             source=MarketSource.POLYMARKET,
+            description="Test description",
+            category="politics",
             question="Test market?",
             yes_price=0.50,
             no_price=0.50,
@@ -126,6 +132,8 @@ class TestSpreadExploitationStrategy(unittest.TestCase):
         snapshot = MarketSnapshot(
             market_id="test-123",
             source=MarketSource.POLYMARKET,
+            description="Test description",
+            category="politics",
             question="Test market?",
             yes_price=0.50,
             no_price=0.50,
@@ -155,6 +163,8 @@ class TestOrderBookImbalanceStrategy(unittest.TestCase):
         snapshot = MarketSnapshot(
             market_id="test-123",
             source=MarketSource.POLYMARKET,
+            description="Test description",
+            category="politics",
             question="Test market?",
             yes_price=0.50,
             timestamp=datetime.utcnow(),
@@ -188,6 +198,8 @@ class TestOrderBookImbalanceStrategy(unittest.TestCase):
         snapshot = MarketSnapshot(
             market_id="test-123",
             source=MarketSource.POLYMARKET,
+            description="Test description",
+            category="politics",
             question="Test market?",
             yes_price=0.50,
             timestamp=datetime.utcnow(),
@@ -228,6 +240,8 @@ class TestLateResolutionStrategy(unittest.TestCase):
         snapshot = MarketSnapshot(
             market_id="test-123",
             source=MarketSource.POLYMARKET,
+            description="Test description",
+            category="politics",
             question="Test market?",
             yes_price=0.75,  # Fairly certain
             no_price=0.25,
@@ -246,6 +260,8 @@ class TestLateResolutionStrategy(unittest.TestCase):
         snapshot = MarketSnapshot(
             market_id="test-123",
             source=MarketSource.POLYMARKET,
+            description="Test description",
+            category="politics",
             question="Test market?",
             yes_price=0.75,
             no_price=0.25,
@@ -272,6 +288,8 @@ class TestFavoriteLongshotBiasStrategy(unittest.TestCase):
         snapshot = MarketSnapshot(
             market_id="test-123",
             source=MarketSource.POLYMARKET,
+            description="Test description",
+            category="politics",
             question="Test market?",
             yes_price=0.05,  # Very low probability - typical longshot
             no_price=0.95,
@@ -290,6 +308,8 @@ class TestFavoriteLongshotBiasStrategy(unittest.TestCase):
         snapshot = MarketSnapshot(
             market_id="test-123",
             source=MarketSource.POLYMARKET,
+            description="Test description",
+            category="politics",
             question="Test market?",
             yes_price=0.95,  # Very high probability - typical favorite
             no_price=0.05,
@@ -308,6 +328,8 @@ class TestFavoriteLongshotBiasStrategy(unittest.TestCase):
         snapshot = MarketSnapshot(
             market_id="test-123",
             source=MarketSource.POLYMARKET,
+            description="Test description",
+            category="politics",
             question="Test market?",
             yes_price=0.50,  # Neutral - no bias expected
             no_price=0.50,
@@ -334,6 +356,8 @@ class TestOverreactionStrategy(unittest.TestCase):
         snapshot = MarketSnapshot(
             market_id="test-123",
             source=MarketSource.POLYMARKET,
+            description="Test description",
+            category="politics",
             question="Test market?",
             yes_price=0.70,
             timestamp=datetime.utcnow(),
@@ -361,6 +385,8 @@ class TestOverreactionStrategy(unittest.TestCase):
         snapshot = MarketSnapshot(
             market_id="test-123",
             source=MarketSource.POLYMARKET,
+            description="Test description",
+            category="politics",
             question="Test market?",
             yes_price=0.50,
             timestamp=datetime.utcnow(),
@@ -396,6 +422,8 @@ class TestHerdingStrategy(unittest.TestCase):
         snapshot = MarketSnapshot(
             market_id="test-123",
             source=MarketSource.POLYMARKET,
+            description="Test description",
+            category="politics",
             question="Test market?",
             yes_price=0.80,
             volume_24h=50000,  # High volume
@@ -421,17 +449,19 @@ class TestHerdingStrategy(unittest.TestCase):
             self.assertIn("herd", result.explanation.lower())
 
 
-class TestAnchoringStrategy(unittest.TestCase):
+class TestAnchoringBiasStrategy(unittest.TestCase):
     """Tests for Anchoring Bias edge detection."""
 
     def setUp(self):
-        self.strategy = AnchoringStrategy()
+        self.strategy = AnchoringBiasStrategy()
 
     def test_anchor_detection(self):
         """Should detect anchoring to previous price levels."""
         snapshot = MarketSnapshot(
             market_id="test-123",
             source=MarketSource.POLYMARKET,
+            description="Test description",
+            category="politics",
             question="Test market?",
             yes_price=0.52,  # Close to 0.50 anchor
             timestamp=datetime.utcnow(),
@@ -466,6 +496,8 @@ class TestStrategyBase(unittest.TestCase):
         snapshot = MarketSnapshot(
             market_id="test-123",
             source=MarketSource.POLYMARKET,
+            description="Test description",
+            category="politics",
             question="Test market?",
             yes_price=0.50,
             timestamp=datetime.utcnow(),

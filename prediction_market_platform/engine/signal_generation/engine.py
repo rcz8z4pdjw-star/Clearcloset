@@ -10,32 +10,36 @@ from datetime import datetime
 from dataclasses import dataclass
 import traceback
 
-from ..data_ingestion.models import (
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+
+from engine.data_ingestion.models import (
     MarketSnapshot, OrderBook, PriceHistory, Signal, MarketSource
 )
-from ..data_ingestion.database import Database, get_database
-from ...strategies.base import Strategy, StrategyResult, StrategyConfig, EnsembleStrategy
+from engine.data_ingestion.database import Database, get_database
+from strategies.base import Strategy, StrategyResult, StrategyConfig, EnsembleStrategy
 
 # Import all strategies
-from ...strategies.structural_edges import (
+from strategies.structural_edges import (
     LiquidityVacuumStrategy,
     SpreadExploitationStrategy,
     OrderBookImbalanceStrategy,
     LateResolutionStrategy,
 )
-from ...strategies.behavioral_edges import (
+from strategies.behavioral_edges import (
     FavoriteLongshotBiasStrategy,
     OverreactionStrategy,
     HerdingStrategy,
     AnchoringBiasStrategy,
 )
-from ...strategies.mispricing_models import (
+from strategies.mispricing_models import (
     CrossMarketArbitrageStrategy,
     ForecastDivergenceStrategy,
     SlowUpdatingMarketStrategy,
 )
-from ...utils.logging_setup import get_logger
-from ...utils.config_loader import get_config, get_strategy_config
+from utils.logging_setup import get_logger
+from utils.config_loader import get_config, get_strategy_config
 
 logger = get_logger("signal_engine")
 

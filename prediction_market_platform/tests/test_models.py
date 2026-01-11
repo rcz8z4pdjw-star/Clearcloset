@@ -22,7 +22,7 @@ from engine.data_ingestion.models import (
     MarketSource, MarketStatus, Signal, Opportunity,
     BacktestResult, BacktestTrade
 )
-from engine.data_ingestion.database import MarketDatabase
+from engine.data_ingestion.database import Database
 
 
 class TestMarketSnapshot(unittest.TestCase):
@@ -33,6 +33,8 @@ class TestMarketSnapshot(unittest.TestCase):
         snapshot = MarketSnapshot(
             market_id="test-123",
             source=MarketSource.POLYMARKET,
+            description="Test description",
+            category="politics",
             question="Will it rain tomorrow?",
             yes_price=0.65,
             no_price=0.35,
@@ -52,6 +54,8 @@ class TestMarketSnapshot(unittest.TestCase):
         snapshot = MarketSnapshot(
             market_id="test-123",
             source=MarketSource.POLYMARKET,
+            description="Test description",
+            category="politics",
             question="Test?",
             best_bid=0.45,
             best_ask=0.55,
@@ -66,6 +70,8 @@ class TestMarketSnapshot(unittest.TestCase):
         snapshot = MarketSnapshot(
             market_id="test-123",
             source=MarketSource.POLYMARKET,
+            description="Test description",
+            category="politics",
             question="Test?",
             best_bid=0.45,
             best_ask=0.55,
@@ -81,6 +87,8 @@ class TestMarketSnapshot(unittest.TestCase):
         snapshot = MarketSnapshot(
             market_id="test-123",
             source=MarketSource.POLYMARKET,
+            description="Test description",
+            category="politics",
             question="Test?",
             timestamp=datetime.utcnow(),
             status=MarketStatus.ACTIVE,
@@ -289,6 +297,8 @@ class TestOpportunity(unittest.TestCase):
             market_id="mkt-123",
             market_name="Test Market",
             source=MarketSource.POLYMARKET,
+            description="Test description",
+            category="politics",
             timestamp=datetime.utcnow(),
             composite_score=0.75,
             expected_value=0.05,
@@ -368,7 +378,7 @@ class TestDatabase(unittest.TestCase):
             suffix='.db', delete=False
         )
         self.temp_file.close()
-        self.db = MarketDatabase(self.temp_file.name)
+        self.db = Database(db_path=self.temp_file.name)
 
     def tearDown(self):
         """Clean up temporary database."""
@@ -382,6 +392,8 @@ class TestDatabase(unittest.TestCase):
         snapshot = MarketSnapshot(
             market_id="test-123",
             source=MarketSource.POLYMARKET,
+            description="Test description",
+            category="politics",
             question="Test market?",
             yes_price=0.65,
             no_price=0.35,
@@ -409,6 +421,8 @@ class TestDatabase(unittest.TestCase):
             snapshot = MarketSnapshot(
                 market_id=f"test-{i}",
                 source=MarketSource.POLYMARKET,
+            description="Test description",
+            category="politics",
                 question=f"Test market {i}?",
                 yes_price=0.50,
                 timestamp=datetime.utcnow(),

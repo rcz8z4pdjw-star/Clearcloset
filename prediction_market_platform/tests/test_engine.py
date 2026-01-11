@@ -72,6 +72,8 @@ class TestSignalEngine(unittest.TestCase):
         snapshot = MarketSnapshot(
             market_id="test-123",
             source=MarketSource.POLYMARKET,
+            description="Test description",
+            category="politics",
             question="Test market?",
             yes_price=0.05,  # Longshot
             no_price=0.95,
@@ -109,6 +111,8 @@ class TestOpportunityScorer(unittest.TestCase):
             market_id="test-123",
             market_name="Test Market",
             source=MarketSource.POLYMARKET,
+            description="Test description",
+            category="politics",
             timestamp=datetime.utcnow(),
             direction=SignalDirection.BUY_YES,
             signal_strength=0.8,
@@ -127,6 +131,8 @@ class TestOpportunityScorer(unittest.TestCase):
         snapshot = MarketSnapshot(
             market_id="test-123",
             source=MarketSource.POLYMARKET,
+            description="Test description",
+            category="politics",
             question="Test market?",
             yes_price=0.50,
             liquidity=5000.0,
@@ -160,6 +166,8 @@ class TestOpportunityScorer(unittest.TestCase):
                 market_id=f"test-{i}",
                 market_name=f"Test Market {i}",
                 source=MarketSource.POLYMARKET,
+            description="Test description",
+            category="politics",
                 timestamp=datetime.utcnow(),
                 direction=SignalDirection.BUY_YES,
                 signal_strength=0.7,
@@ -179,6 +187,8 @@ class TestOpportunityScorer(unittest.TestCase):
             snapshots[f"test-{i}"] = MarketSnapshot(
                 market_id=f"test-{i}",
                 source=MarketSource.POLYMARKET,
+            description="Test description",
+            category="politics",
                 question=f"Test {i}?",
                 yes_price=0.50,
                 liquidity=5000.0,
@@ -211,6 +221,8 @@ class TestFeatureExtractor(unittest.TestCase):
         snapshot = MarketSnapshot(
             market_id="test-123",
             source=MarketSource.POLYMARKET,
+            description="Test description",
+            category="politics",
             question="Test market?",
             yes_price=0.60,
             no_price=0.40,
@@ -237,6 +249,8 @@ class TestFeatureExtractor(unittest.TestCase):
         snapshot = MarketSnapshot(
             market_id="test-123",
             source=MarketSource.POLYMARKET,
+            description="Test description",
+            category="politics",
             question="Test?",
             yes_price=0.60,
             timestamp=datetime.utcnow(),
@@ -333,6 +347,8 @@ class TestDataValidator(unittest.TestCase):
         snapshot = MarketSnapshot(
             market_id="test-123",
             source=MarketSource.POLYMARKET,
+            description="Test description",
+            category="politics",
             question="Test market?",
             yes_price=0.60,
             no_price=0.40,
@@ -352,6 +368,8 @@ class TestDataValidator(unittest.TestCase):
         snapshot = MarketSnapshot(
             market_id="",  # Missing
             source=MarketSource.POLYMARKET,
+            description="Test description",
+            category="politics",
             question="Test?",
             yes_price=0.50,
             timestamp=datetime.utcnow(),
@@ -367,6 +385,8 @@ class TestDataValidator(unittest.TestCase):
         snapshot = MarketSnapshot(
             market_id="test-123",
             source=MarketSource.POLYMARKET,
+            description="Test description",
+            category="politics",
             question="Test?",
             yes_price=1.5,  # Invalid - > 1
             timestamp=datetime.utcnow(),
@@ -381,6 +401,8 @@ class TestDataValidator(unittest.TestCase):
         snapshot = MarketSnapshot(
             market_id="test-123",
             source=MarketSource.POLYMARKET,
+            description="Test description",
+            category="politics",
             question="Test?",
             yes_price=0.50,
             best_bid=0.55,  # Crossed
@@ -398,6 +420,8 @@ class TestDataValidator(unittest.TestCase):
         snapshot = MarketSnapshot(
             market_id="test-123",
             source=MarketSource.POLYMARKET,
+            description="Test description",
+            category="politics",
             question="Test?",
             yes_price=0.50,
             timestamp=old_timestamp,  # Old

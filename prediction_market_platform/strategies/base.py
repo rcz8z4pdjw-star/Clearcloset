@@ -15,10 +15,14 @@ from datetime import datetime
 from typing import List, Optional, Dict, Any, Tuple
 from enum import Enum
 
-from ..engine.data_ingestion.models import (
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+from engine.data_ingestion.models import (
     MarketSnapshot, OrderBook, PriceHistory, Signal, MarketSource
 )
-from ..utils.helpers import calculate_expected_value, calculate_kelly_criterion
+from utils.helpers import calculate_expected_value, calculate_kelly_criterion
 
 
 class SignalDirection(Enum):

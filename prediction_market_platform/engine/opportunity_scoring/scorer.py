@@ -13,13 +13,17 @@ from datetime import datetime
 from dataclasses import dataclass, field
 from collections import defaultdict
 
-from ..data_ingestion.models import (
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+
+from engine.data_ingestion.models import (
     MarketSnapshot, Opportunity, Signal, MarketSource
 )
-from ..data_ingestion.database import Database, get_database
-from ...strategies.base import StrategyResult, SignalDirection
-from ...utils.config_loader import get_config
-from ...utils.logging_setup import get_logger
+from engine.data_ingestion.database import Database, get_database
+from strategies.base import StrategyResult, SignalDirection
+from utils.config_loader import get_config
+from utils.logging_setup import get_logger
 
 logger = get_logger("opportunity_scorer")
 
