@@ -19,6 +19,9 @@ from .models import (
     BacktestResult,
 )
 from .database import Database, get_database
+from .polymarket_collector import PolymarketCollector
+from .kalshi_collector import KalshiCollector
+from .validation import DataValidator
 
 __all__ = [
     # Enums
@@ -38,4 +41,9 @@ __all__ = [
     # Database
     'Database',
     'get_database',
+    # Collectors
+    'PolymarketCollector',
+    'KalshiCollector',
+    # Validation
+    'DataValidator',
 ]

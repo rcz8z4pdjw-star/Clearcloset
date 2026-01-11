@@ -377,6 +377,23 @@ class Database:
 
             return [self._row_to_snapshot(row) for row in cursor.fetchall()]
 
+    # Alias methods for convenience
+    def save_market(self, market: MarketSnapshot) -> int:
+        """Alias for save_snapshot."""
+        return self.save_snapshot(market)
+
+    def get_market(self, market_id: str, source: Optional[MarketSource] = None) -> Optional[MarketSnapshot]:
+        """Alias for get_latest_snapshot."""
+        return self.get_latest_snapshot(market_id, source)
+
+    def get_all_markets(self, source: Optional[MarketSource] = None) -> List[MarketSnapshot]:
+        """Get all unique markets (latest snapshot for each)."""
+        return self.get_active_markets(source)
+
+    def get_recent_opportunities(self, limit: int = 50) -> List[Opportunity]:
+        """Alias for get_latest_opportunities."""
+        return self.get_latest_opportunities(limit)
+
     def get_active_markets(
         self,
         source: Optional[MarketSource] = None

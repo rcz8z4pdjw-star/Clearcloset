@@ -106,6 +106,31 @@ class OpportunityScorer:
         self.thresholds = thresholds or ScoringThresholds.from_config()
         self.db = db or get_database()
 
+    def score_market(
+        self,
+        market: MarketSnapshot,
+        signals: List[StrategyResult]
+    ) -> Optional[Opportunity]:
+        """
+        Score a single market (public interface).
+
+        Args:
+            market: Market snapshot to score
+            signals: Signals for this market
+
+        Returns:
+            Opportunity or None if below thresholds
+        """
+        return self._score_market(market, signals)
+
+    def score_opportunity(
+        self,
+        market: MarketSnapshot,
+        signals: List[StrategyResult]
+    ) -> Optional[Opportunity]:
+        """Alias for score_market."""
+        return self._score_market(market, signals)
+
     def score_opportunities(
         self,
         signals: List[StrategyResult],

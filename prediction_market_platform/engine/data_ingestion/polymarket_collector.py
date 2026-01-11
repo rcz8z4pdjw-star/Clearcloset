@@ -13,6 +13,10 @@ API Documentation:
 - https://gamma-api.polymarket.com/
 """
 
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+
 import time
 import json
 from datetime import datetime, timezone
@@ -22,12 +26,12 @@ import urllib.request
 import urllib.error
 import urllib.parse
 
-from .models import (
+from engine.data_ingestion.models import (
     MarketSnapshot, OrderBook, OrderBookLevel, MarketResolution,
     MarketSource, MarketStatus, OutcomeResult
 )
-from .database import Database
-from ...utils.logging_setup import get_logger
+from engine.data_ingestion.database import Database
+from utils.logging_setup import get_logger
 
 logger = get_logger("polymarket_collector")
 
@@ -236,6 +240,37 @@ class PolymarketCollector:
         except Exception as e:
             logger.debug(f"Failed to fetch price for {token_id}: {e}")
             return None
+
+    # ==========================================================================
+    # BATCH COLLECTION
+    # ==========================================================================
+
+    def collect_active_markets(self, limit: int = 100) -> List[MarketSnapshot]:
+        """
+        Collect all active markets and normalize them.
+
+        Args:
+            limit: Maximum number of markets to collect
+
+        Returns:
+            List of normalized MarketSnapshot objects
+        """
+        logger.info(f"Collecting active markets from Polymarket (limit={limit})")
+
+        raw_markets = self.fetch_markets(active_only=True, limit=limit)
+        logger.info(f"Fetched {len(raw_markets)} raw markets")
+
+        markets = []
+        for raw in raw_markets:
+            try:
+                snapshot = self.normalize_market(raw)
+                if snapshot:
+                    markets.append(snapshot)
+            except Exception as e:
+                logger.debug(f"Failed to normalize market: {e}")
+
+        logger.info(f"Normalized {len(markets)} markets")
+        return markets
 
     # ==========================================================================
     # DATA NORMALIZATION
