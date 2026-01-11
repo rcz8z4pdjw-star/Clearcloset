@@ -1,25 +1,52 @@
 # Prediction Market Research Platform - Dependencies
+# Install with: pip install -r requirements.txt
 
-# Core dependencies
+# Core dependencies (required)
 pyyaml>=6.0
 requests>=2.28.0
 
-# Optional: Enhanced data handling
-# pyarrow>=12.0
-# pandas>=2.0
-# numpy>=1.24
+# Data handling (recommended)
+pandas>=2.0
+numpy>=1.24
 
-# Optional: Web framework for dashboards
-# flask>=2.3
-# flask-cors>=4.0
+# Web dashboard (recommended)
+flask>=2.3
+flask-cors>=4.0
+
+# RSS feed parsing for news
+feedparser>=6.0
+
+# Social media (optional - uses mock data without these)
+praw>=7.7  # Reddit API
+tweepy>=4.14  # Twitter API
+
+# Async support
+aiohttp>=3.8
+
+# Scheduling
+schedule>=1.2
+
+# Database (SQLite included in Python stdlib)
+
+# Optional: Enhanced performance
+# pyarrow>=12.0  # Fast data serialization
 
 # Optional: Automated trading (requires API keys)
 # web3>=6.0           # Polymarket blockchain interactions
 # py_clob_client      # Polymarket CLOB client
 
-# Optional: Testing
-# pytest>=7.0
-# pytest-cov>=4.0
+# Development & Testing
+pytest>=7.0
+pytest-cov>=4.0
+pytest-asyncio>=0.21
 
-# Optional: Type checking
-# mypy>=1.0
+# Type checking
+mypy>=1.0
+
+# Code formatting (optional)
+# black>=23.0
+# isort>=5.12
+
+# Linting (optional)
+# flake8>=6.0
+# pylint>=2.17
