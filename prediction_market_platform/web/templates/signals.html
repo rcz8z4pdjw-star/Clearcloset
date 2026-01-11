@@ -1,0 +1,553 @@
+{% extends "base.html" %}
+
+{% block title %}Signals - PredictFlow{% endblock %}
+
+{% block content %}
+<!-- Top Bar -->
+<div class="topbar">
+    <h1 class="page-title">Trading Signals</h1>
+    <div class="topbar-actions">
+        <div class="status-indicator">
+            <span class="status-dot"></span>
+            <span id="signal-count">0</span> active signals
+        </div>
+        <button class="btn btn-secondary" onclick="refreshSignals()">
+            <i class="fas fa-sync-alt"></i>
+            Refresh
+        </button>
+    </div>
+</div>
+
+<!-- Page Content -->
+<div class="page-content">
+    <!-- Strategy Performance -->
+    <div class="grid grid-cols-4" style="margin-bottom: 1.5rem;">
+        <div class="stat-card">
+            <div class="stat-label">Total Signals (24h)</div>
+            <div class="stat-value" id="total-signals">-</div>
+            <div class="stat-change" style="color: var(--text-muted);">
+                <i class="fas fa-clock"></i>
+                <span>Last 24 hours</span>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Avg Confidence</div>
+            <div class="stat-value" id="avg-confidence">--%</div>
+            <div class="stat-change" style="color: var(--text-muted);">
+                <span>Across all signals</span>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Strong Signals</div>
+            <div class="stat-value sentiment-bullish" id="strong-signals">-</div>
+            <div class="stat-change" style="color: var(--text-muted);">
+                <span>Strength &gt; 0.7</span>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Active Strategies</div>
+            <div class="stat-value" id="active-strategies">7</div>
+            <div class="stat-change" style="color: var(--text-muted);">
+                <span>All running</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="grid" style="grid-template-columns: 2fr 1fr; margin-bottom: 1.5rem;">
+        <!-- Signals Table -->
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">
+                    <i class="fas fa-bolt" style="color: var(--accent-yellow);"></i>
+                    Recent Signals
+                </h3>
+                <div class="filter-tabs">
+                    <button class="filter-tab active" data-filter="all">All</button>
+                    <button class="filter-tab" data-filter="buy">Buy</button>
+                    <button class="filter-tab" data-filter="sell">Sell</button>
+                    <button class="filter-tab" data-filter="strong">Strong</button>
+                </div>
+            </div>
+            <div class="card-body" style="padding: 0;">
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Time</th>
+                                <th>Strategy</th>
+                                <th>Market</th>
+                                <th>Direction</th>
+                                <th>Strength</th>
+                                <th>Confidence</th>
+                                <th>EV</th>
+                            </tr>
+                        </thead>
+                        <tbody id="signals-table">
+                            <tr>
+                                <td colspan="7" class="loading">
+                                    <div class="spinner"></div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Strategy Stats -->
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">
+                    <i class="fas fa-brain" style="color: var(--accent-purple);"></i>
+                    Strategy Breakdown
+                </h3>
+            </div>
+            <div class="card-body" style="padding: 0;">
+                <div id="strategy-list">
+                    <div class="strategy-item">
+                        <div class="strategy-info">
+                            <div class="strategy-name">Sentiment Divergence</div>
+                            <div class="strategy-signals">Detecting sentiment vs price gaps</div>
+                        </div>
+                        <div class="strategy-badge badge-green">Active</div>
+                    </div>
+                    <div class="strategy-item">
+                        <div class="strategy-info">
+                            <div class="strategy-name">Anchoring Bias</div>
+                            <div class="strategy-signals">Finding anchoring inefficiencies</div>
+                        </div>
+                        <div class="strategy-badge badge-green">Active</div>
+                    </div>
+                    <div class="strategy-item">
+                        <div class="strategy-info">
+                            <div class="strategy-name">Herding Reversal</div>
+                            <div class="strategy-signals">Detecting crowd behavior</div>
+                        </div>
+                        <div class="strategy-badge badge-green">Active</div>
+                    </div>
+                    <div class="strategy-item">
+                        <div class="strategy-info">
+                            <div class="strategy-name">Calendar Spread</div>
+                            <div class="strategy-signals">Time-based mispricings</div>
+                        </div>
+                        <div class="strategy-badge badge-green">Active</div>
+                    </div>
+                    <div class="strategy-item">
+                        <div class="strategy-info">
+                            <div class="strategy-name">Liquidity Premium</div>
+                            <div class="strategy-signals">Low liquidity opportunities</div>
+                        </div>
+                        <div class="strategy-badge badge-green">Active</div>
+                    </div>
+                    <div class="strategy-item">
+                        <div class="strategy-info">
+                            <div class="strategy-name">Expected Value</div>
+                            <div class="strategy-signals">EV vs market price analysis</div>
+                        </div>
+                        <div class="strategy-badge badge-green">Active</div>
+                    </div>
+                    <div class="strategy-item">
+                        <div class="strategy-info">
+                            <div class="strategy-name">Longshot Bias</div>
+                            <div class="strategy-signals">Finding overpriced longshots</div>
+                        </div>
+                        <div class="strategy-badge badge-green">Active</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Signal Distribution Chart -->
+    <div class="grid grid-cols-2">
+        <!-- Signal Strength Distribution -->
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">
+                    <i class="fas fa-chart-bar" style="color: var(--accent-blue);"></i>
+                    Strength Distribution
+                </h3>
+            </div>
+            <div class="card-body">
+                <div style="height: 250px;">
+                    <canvas id="strength-chart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Signals Over Time -->
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">
+                    <i class="fas fa-chart-line" style="color: var(--accent-green);"></i>
+                    Signal Activity
+                </h3>
+            </div>
+            <div class="card-body">
+                <div style="height: 250px;">
+                    <canvas id="activity-chart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    .filter-tabs {
+        display: flex;
+        gap: 0.5rem;
+    }
+
+    .filter-tab {
+        padding: 0.35rem 0.75rem;
+        background: transparent;
+        border: 1px solid var(--border-color);
+        border-radius: 6px;
+        color: var(--text-secondary);
+        font-size: 0.75rem;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .filter-tab:hover {
+        border-color: var(--accent-blue);
+        color: var(--accent-blue);
+    }
+
+    .filter-tab.active {
+        background: var(--accent-blue);
+        border-color: var(--accent-blue);
+        color: white;
+    }
+
+    .strategy-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.875rem 1rem;
+        border-bottom: 1px solid var(--border-color);
+    }
+
+    .strategy-item:hover {
+        background: var(--bg-hover);
+    }
+
+    .strategy-name {
+        font-weight: 500;
+        font-size: 0.9rem;
+    }
+
+    .strategy-signals {
+        font-size: 0.75rem;
+        color: var(--text-muted);
+        margin-top: 0.15rem;
+    }
+
+    .strategy-badge {
+        font-size: 0.7rem;
+        padding: 0.2rem 0.5rem;
+        border-radius: 4px;
+    }
+
+    .signal-row {
+        transition: background 0.2s;
+    }
+
+    .signal-row:hover {
+        background: var(--bg-hover);
+    }
+
+    .signal-time {
+        font-size: 0.8rem;
+        color: var(--text-muted);
+        font-family: 'JetBrains Mono', monospace;
+    }
+
+    .signal-strategy {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .strategy-icon {
+        width: 24px;
+        height: 24px;
+        border-radius: 6px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.7rem;
+        background: var(--accent-purple);
+        background: rgba(139, 92, 246, 0.15);
+        color: var(--accent-purple);
+    }
+
+    .signal-market {
+        max-width: 180px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .direction-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.25rem;
+        font-size: 0.75rem;
+        font-weight: 600;
+        padding: 0.25rem 0.6rem;
+        border-radius: 4px;
+    }
+
+    .direction-badge.buy {
+        background: var(--accent-green-dim);
+        color: var(--accent-green);
+    }
+
+    .direction-badge.sell {
+        background: var(--accent-red-dim);
+        color: var(--accent-red);
+    }
+
+    .strength-bar {
+        width: 80px;
+        height: 6px;
+        background: var(--bg-hover);
+        border-radius: 3px;
+        overflow: hidden;
+    }
+
+    .strength-fill {
+        height: 100%;
+        border-radius: 3px;
+    }
+
+    .strength-fill.high { background: var(--accent-green); }
+    .strength-fill.medium { background: var(--accent-yellow); }
+    .strength-fill.low { background: var(--accent-red); }
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    let strengthChart = null;
+    let activityChart = null;
+    let currentFilter = 'all';
+    let allSignals = [];
+
+    // Initialize charts
+    function initCharts() {
+        // Strength Distribution
+        const strengthCtx = document.getElementById('strength-chart').getContext('2d');
+        strengthChart = new Chart(strengthCtx, {
+            type: 'bar',
+            data: {
+                labels: ['0.0-0.2', '0.2-0.4', '0.4-0.6', '0.6-0.8', '0.8-1.0'],
+                datasets: [{
+                    label: 'Signals',
+                    data: [5, 12, 18, 15, 8],
+                    backgroundColor: [
+                        'rgba(255, 71, 87, 0.8)',
+                        'rgba(251, 191, 36, 0.8)',
+                        'rgba(59, 130, 246, 0.8)',
+                        'rgba(0, 210, 106, 0.7)',
+                        'rgba(0, 210, 106, 1)'
+                    ],
+                    borderRadius: 4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: {
+                    x: {
+                        grid: { display: false },
+                        ticks: { color: '#6b6b7b' }
+                    },
+                    y: {
+                        grid: { color: 'rgba(42, 42, 58, 0.5)' },
+                        ticks: { color: '#6b6b7b' }
+                    }
+                }
+            }
+        });
+
+        // Activity Chart
+        const activityCtx = document.getElementById('activity-chart').getContext('2d');
+        activityChart = new Chart(activityCtx, {
+            type: 'line',
+            data: {
+                labels: ['6h', '5h', '4h', '3h', '2h', '1h', 'Now'],
+                datasets: [
+                    {
+                        label: 'Buy Signals',
+                        data: [8, 12, 9, 15, 11, 18, 14],
+                        borderColor: 'rgba(0, 210, 106, 1)',
+                        backgroundColor: 'transparent',
+                        tension: 0.4
+                    },
+                    {
+                        label: 'Sell Signals',
+                        data: [5, 7, 8, 6, 9, 7, 8],
+                        borderColor: 'rgba(255, 71, 87, 1)',
+                        backgroundColor: 'transparent',
+                        tension: 0.4
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: { color: '#a0a0b0', usePointStyle: true }
+                    }
+                },
+                scales: {
+                    x: {
+                        grid: { color: 'rgba(42, 42, 58, 0.5)' },
+                        ticks: { color: '#6b6b7b' }
+                    },
+                    y: {
+                        grid: { color: 'rgba(42, 42, 58, 0.5)' },
+                        ticks: { color: '#6b6b7b' }
+                    }
+                }
+            }
+        });
+    }
+
+    // Load signals
+    async function loadSignals() {
+        const data = await fetchData('/api/signals');
+
+        if (data) {
+            allSignals = data;
+            document.getElementById('signal-count').textContent = data.length;
+            document.getElementById('total-signals').textContent = data.length;
+
+            // Calculate stats
+            if (data.length > 0) {
+                const avgConf = data.reduce((sum, s) => sum + (s.confidence || 0), 0) / data.length;
+                document.getElementById('avg-confidence').textContent = (avgConf * 100).toFixed(0) + '%';
+
+                const strongCount = data.filter(s => (s.strength || 0) > 0.7).length;
+                document.getElementById('strong-signals').textContent = strongCount;
+            }
+
+            applyFilter();
+        }
+    }
+
+    // Apply filter
+    function applyFilter() {
+        let filtered = allSignals;
+
+        switch (currentFilter) {
+            case 'buy':
+                filtered = allSignals.filter(s => s.direction === 'BUY');
+                break;
+            case 'sell':
+                filtered = allSignals.filter(s => s.direction === 'SELL');
+                break;
+            case 'strong':
+                filtered = allSignals.filter(s => (s.strength || 0) > 0.7);
+                break;
+        }
+
+        renderSignals(filtered);
+    }
+
+    // Render signals table
+    function renderSignals(signals) {
+        const table = document.getElementById('signals-table');
+
+        if (!signals || signals.length === 0) {
+            table.innerHTML = `
+                <tr>
+                    <td colspan="7" class="empty-state">
+                        <i class="fas fa-signal"></i>
+                        <p>No signals found</p>
+                    </td>
+                </tr>
+            `;
+            return;
+        }
+
+        table.innerHTML = signals.map(signal => {
+            const strengthClass = signal.strength >= 0.7 ? 'high' : signal.strength >= 0.4 ? 'medium' : 'low';
+            const time = signal.timestamp ? new Date(signal.timestamp).toLocaleTimeString() : 'Now';
+
+            return `
+                <tr class="signal-row">
+                    <td class="signal-time">${time}</td>
+                    <td>
+                        <div class="signal-strategy">
+                            <div class="strategy-icon"><i class="fas fa-brain"></i></div>
+                            <span>${signal.strategy}</span>
+                        </div>
+                    </td>
+                    <td class="signal-market">${signal.market_id}</td>
+                    <td>
+                        <span class="direction-badge ${signal.direction === 'BUY' ? 'buy' : 'sell'}">
+                            <i class="fas fa-arrow-${signal.direction === 'BUY' ? 'up' : 'down'}"></i>
+                            ${signal.direction}
+                        </span>
+                    </td>
+                    <td>
+                        <div style="display: flex; align-items: center; gap: 0.5rem;">
+                            <span style="font-family: 'JetBrains Mono', monospace; min-width: 40px;">
+                                ${(signal.strength * 100).toFixed(0)}%
+                            </span>
+                            <div class="strength-bar">
+                                <div class="strength-fill ${strengthClass}" style="width: ${signal.strength * 100}%;"></div>
+                            </div>
+                        </div>
+                    </td>
+                    <td style="font-family: 'JetBrains Mono', monospace;">
+                        ${(signal.confidence * 100).toFixed(0)}%
+                    </td>
+                    <td class="${signal.ev >= 0 ? 'sentiment-bullish' : 'sentiment-bearish'}" style="font-family: 'JetBrains Mono', monospace;">
+                        ${signal.ev >= 0 ? '+' : ''}${signal.ev}%
+                    </td>
+                </tr>
+            `;
+        }).join('');
+    }
+
+    // Filter tabs
+    document.querySelectorAll('.filter-tab').forEach(tab => {
+        tab.addEventListener('click', () => {
+            document.querySelectorAll('.filter-tab').forEach(t => t.classList.remove('active'));
+            tab.classList.add('active');
+            currentFilter = tab.dataset.filter;
+            applyFilter();
+        });
+    });
+
+    // Refresh
+    async function refreshSignals() {
+        document.getElementById('signals-table').innerHTML = `
+            <tr>
+                <td colspan="7" class="loading">
+                    <div class="spinner"></div>
+                </td>
+            </tr>
+        `;
+
+        await fetch('/api/refresh', { method: 'POST' });
+        await loadSignals();
+    }
+
+    // Initialize
+    document.addEventListener('DOMContentLoaded', () => {
+        initCharts();
+        loadSignals();
+    });
+</script>
+{% endblock %}

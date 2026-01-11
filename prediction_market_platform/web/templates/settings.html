@@ -1,0 +1,675 @@
+{% extends "base.html" %}
+
+{% block title %}Settings - PredictFlow{% endblock %}
+
+{% block content %}
+<!-- Top Bar -->
+<div class="topbar">
+    <h1 class="page-title">Settings</h1>
+    <div class="topbar-actions">
+        <button class="btn btn-primary" onclick="saveSettings()">
+            <i class="fas fa-save"></i>
+            Save Changes
+        </button>
+    </div>
+</div>
+
+<!-- Page Content -->
+<div class="page-content">
+    <div class="settings-grid">
+        <!-- API Configuration -->
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">
+                    <i class="fas fa-key" style="color: var(--accent-yellow);"></i>
+                    API Configuration
+                </h3>
+            </div>
+            <div class="card-body">
+                <div class="setting-group">
+                    <label class="setting-label">Polymarket API Key</label>
+                    <div class="input-with-icon">
+                        <input type="password" class="setting-input" id="polymarket-api" placeholder="Enter your Polymarket API key">
+                        <button class="toggle-visibility" onclick="togglePassword('polymarket-api')">
+                            <i class="fas fa-eye"></i>
+                        </button>
+                    </div>
+                    <p class="setting-help">Used for fetching real-time market data</p>
+                </div>
+
+                <div class="setting-group">
+                    <label class="setting-label">Kalshi API Key</label>
+                    <div class="input-with-icon">
+                        <input type="password" class="setting-input" id="kalshi-api" placeholder="Enter your Kalshi API key">
+                        <button class="toggle-visibility" onclick="togglePassword('kalshi-api')">
+                            <i class="fas fa-eye"></i>
+                        </button>
+                    </div>
+                    <p class="setting-help">Used for Kalshi market data access</p>
+                </div>
+
+                <div class="setting-group">
+                    <label class="setting-label">Twitter Bearer Token</label>
+                    <div class="input-with-icon">
+                        <input type="password" class="setting-input" id="twitter-token" placeholder="Enter Twitter API bearer token">
+                        <button class="toggle-visibility" onclick="togglePassword('twitter-token')">
+                            <i class="fas fa-eye"></i>
+                        </button>
+                    </div>
+                    <p class="setting-help">Required for social sentiment analysis</p>
+                </div>
+
+                <div class="setting-group">
+                    <label class="setting-label">Reddit Client ID</label>
+                    <div class="input-with-icon">
+                        <input type="password" class="setting-input" id="reddit-client" placeholder="Enter Reddit client ID">
+                        <button class="toggle-visibility" onclick="togglePassword('reddit-client')">
+                            <i class="fas fa-eye"></i>
+                        </button>
+                    </div>
+                    <p class="setting-help">For Reddit sentiment monitoring</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Trading Settings -->
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">
+                    <i class="fas fa-sliders-h" style="color: var(--accent-blue);"></i>
+                    Trading Settings
+                </h3>
+            </div>
+            <div class="card-body">
+                <div class="setting-group">
+                    <label class="setting-label">Default Position Size</label>
+                    <div class="input-with-addon">
+                        <span class="addon">$</span>
+                        <input type="number" class="setting-input" id="position-size" value="100" min="1">
+                    </div>
+                    <p class="setting-help">Default amount for new positions</p>
+                </div>
+
+                <div class="setting-group">
+                    <label class="setting-label">Kelly Fraction</label>
+                    <div class="input-with-addon">
+                        <input type="number" class="setting-input" id="kelly-fraction" value="25" min="0" max="100">
+                        <span class="addon">%</span>
+                    </div>
+                    <p class="setting-help">Fraction of full Kelly to use (25% recommended)</p>
+                </div>
+
+                <div class="setting-group">
+                    <label class="setting-label">Minimum Score Threshold</label>
+                    <input type="range" class="setting-range" id="min-score" value="0.5" min="0" max="1" step="0.1">
+                    <div class="range-labels">
+                        <span>0.0</span>
+                        <span id="min-score-value">0.5</span>
+                        <span>1.0</span>
+                    </div>
+                    <p class="setting-help">Only show opportunities above this score</p>
+                </div>
+
+                <div class="setting-group">
+                    <label class="setting-label">Minimum EV Threshold</label>
+                    <div class="input-with-addon">
+                        <input type="number" class="setting-input" id="min-ev" value="5" min="-100" max="100">
+                        <span class="addon">%</span>
+                    </div>
+                    <p class="setting-help">Minimum expected value to consider</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Notification Settings -->
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">
+                    <i class="fas fa-bell" style="color: var(--accent-green);"></i>
+                    Notifications
+                </h3>
+            </div>
+            <div class="card-body">
+                <div class="setting-group">
+                    <div class="setting-toggle">
+                        <div>
+                            <label class="setting-label">High-Value Opportunities</label>
+                            <p class="setting-help">Alert when score > 0.8</p>
+                        </div>
+                        <label class="toggle">
+                            <input type="checkbox" id="notify-high-value" checked>
+                            <span class="toggle-slider"></span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="setting-group">
+                    <div class="setting-toggle">
+                        <div>
+                            <label class="setting-label">Social Sentiment Spikes</label>
+                            <p class="setting-help">Alert on unusual social activity</p>
+                        </div>
+                        <label class="toggle">
+                            <input type="checkbox" id="notify-sentiment" checked>
+                            <span class="toggle-slider"></span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="setting-group">
+                    <div class="setting-toggle">
+                        <div>
+                            <label class="setting-label">Breaking News</label>
+                            <p class="setting-help">Alert for market-moving news</p>
+                        </div>
+                        <label class="toggle">
+                            <input type="checkbox" id="notify-news" checked>
+                            <span class="toggle-slider"></span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="setting-group">
+                    <div class="setting-toggle">
+                        <div>
+                            <label class="setting-label">Price Alerts</label>
+                            <p class="setting-help">Alert on significant price movements</p>
+                        </div>
+                        <label class="toggle">
+                            <input type="checkbox" id="notify-price">
+                            <span class="toggle-slider"></span>
+                        </label>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Strategy Settings -->
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">
+                    <i class="fas fa-brain" style="color: var(--accent-purple);"></i>
+                    Active Strategies
+                </h3>
+            </div>
+            <div class="card-body">
+                <div class="strategy-toggles">
+                    <div class="setting-group">
+                        <div class="setting-toggle">
+                            <div>
+                                <label class="setting-label">Sentiment Divergence</label>
+                            </div>
+                            <label class="toggle">
+                                <input type="checkbox" checked>
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+                    </div>
+                    <div class="setting-group">
+                        <div class="setting-toggle">
+                            <div>
+                                <label class="setting-label">Anchoring Bias</label>
+                            </div>
+                            <label class="toggle">
+                                <input type="checkbox" checked>
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+                    </div>
+                    <div class="setting-group">
+                        <div class="setting-toggle">
+                            <div>
+                                <label class="setting-label">Herding Reversal</label>
+                            </div>
+                            <label class="toggle">
+                                <input type="checkbox" checked>
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+                    </div>
+                    <div class="setting-group">
+                        <div class="setting-toggle">
+                            <div>
+                                <label class="setting-label">Calendar Spread</label>
+                            </div>
+                            <label class="toggle">
+                                <input type="checkbox" checked>
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+                    </div>
+                    <div class="setting-group">
+                        <div class="setting-toggle">
+                            <div>
+                                <label class="setting-label">Liquidity Premium</label>
+                            </div>
+                            <label class="toggle">
+                                <input type="checkbox" checked>
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+                    </div>
+                    <div class="setting-group">
+                        <div class="setting-toggle">
+                            <div>
+                                <label class="setting-label">Expected Value</label>
+                            </div>
+                            <label class="toggle">
+                                <input type="checkbox" checked>
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+                    </div>
+                    <div class="setting-group">
+                        <div class="setting-toggle">
+                            <div>
+                                <label class="setting-label">Longshot Bias</label>
+                            </div>
+                            <label class="toggle">
+                                <input type="checkbox" checked>
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Display Settings -->
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">
+                    <i class="fas fa-palette" style="color: var(--accent-yellow);"></i>
+                    Display Settings
+                </h3>
+            </div>
+            <div class="card-body">
+                <div class="setting-group">
+                    <label class="setting-label">Refresh Interval</label>
+                    <select class="setting-select" id="refresh-interval">
+                        <option value="30">30 seconds</option>
+                        <option value="60" selected>1 minute</option>
+                        <option value="120">2 minutes</option>
+                        <option value="300">5 minutes</option>
+                    </select>
+                    <p class="setting-help">How often to refresh dashboard data</p>
+                </div>
+
+                <div class="setting-group">
+                    <label class="setting-label">Results Per Page</label>
+                    <select class="setting-select" id="results-per-page">
+                        <option value="10">10</option>
+                        <option value="20" selected>20</option>
+                        <option value="50">50</option>
+                        <option value="100">100</option>
+                    </select>
+                    <p class="setting-help">Number of items to show in tables</p>
+                </div>
+
+                <div class="setting-group">
+                    <label class="setting-label">Time Zone</label>
+                    <select class="setting-select" id="timezone">
+                        <option value="America/New_York">Eastern Time (ET)</option>
+                        <option value="America/Chicago">Central Time (CT)</option>
+                        <option value="America/Denver">Mountain Time (MT)</option>
+                        <option value="America/Los_Angeles">Pacific Time (PT)</option>
+                        <option value="UTC">UTC</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <!-- Data Management -->
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">
+                    <i class="fas fa-database" style="color: var(--accent-red);"></i>
+                    Data Management
+                </h3>
+            </div>
+            <div class="card-body">
+                <div class="setting-group">
+                    <label class="setting-label">Export Data</label>
+                    <div class="button-group">
+                        <button class="btn btn-secondary" onclick="exportData('opportunities')">
+                            <i class="fas fa-download"></i> Opportunities
+                        </button>
+                        <button class="btn btn-secondary" onclick="exportData('signals')">
+                            <i class="fas fa-download"></i> Signals
+                        </button>
+                        <button class="btn btn-secondary" onclick="exportData('portfolio')">
+                            <i class="fas fa-download"></i> Portfolio
+                        </button>
+                    </div>
+                </div>
+
+                <div class="setting-group" style="margin-top: 1.5rem;">
+                    <label class="setting-label">Clear Cache</label>
+                    <p class="setting-help" style="margin-bottom: 0.75rem;">
+                        Remove cached data to fetch fresh information
+                    </p>
+                    <button class="btn btn-danger" onclick="clearCache()">
+                        <i class="fas fa-trash"></i> Clear All Cache
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    .settings-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 1.5rem;
+    }
+
+    .setting-group {
+        margin-bottom: 1.25rem;
+    }
+
+    .setting-group:last-child {
+        margin-bottom: 0;
+    }
+
+    .setting-label {
+        display: block;
+        font-weight: 500;
+        font-size: 0.9rem;
+        margin-bottom: 0.5rem;
+    }
+
+    .setting-help {
+        font-size: 0.75rem;
+        color: var(--text-muted);
+        margin-top: 0.35rem;
+    }
+
+    .setting-input, .setting-select {
+        width: 100%;
+        padding: 0.6rem 0.75rem;
+        background: var(--bg-hover);
+        border: 1px solid var(--border-color);
+        border-radius: 6px;
+        color: var(--text-primary);
+        font-size: 0.9rem;
+    }
+
+    .setting-input:focus, .setting-select:focus {
+        outline: none;
+        border-color: var(--accent-blue);
+    }
+
+    .input-with-icon {
+        position: relative;
+    }
+
+    .input-with-icon .setting-input {
+        padding-right: 40px;
+    }
+
+    .toggle-visibility {
+        position: absolute;
+        right: 10px;
+        top: 50%;
+        transform: translateY(-50%);
+        background: none;
+        border: none;
+        color: var(--text-muted);
+        cursor: pointer;
+    }
+
+    .toggle-visibility:hover {
+        color: var(--text-primary);
+    }
+
+    .input-with-addon {
+        display: flex;
+    }
+
+    .input-with-addon .setting-input {
+        border-radius: 6px 0 0 6px;
+    }
+
+    .input-with-addon .addon {
+        background: var(--bg-hover);
+        border: 1px solid var(--border-color);
+        border-left: none;
+        padding: 0.6rem 0.75rem;
+        border-radius: 0 6px 6px 0;
+        color: var(--text-muted);
+        font-size: 0.9rem;
+    }
+
+    .input-with-addon .addon:first-child {
+        border-left: 1px solid var(--border-color);
+        border-right: none;
+        border-radius: 6px 0 0 6px;
+    }
+
+    .input-with-addon .addon:first-child + .setting-input {
+        border-radius: 0 6px 6px 0;
+    }
+
+    .setting-range {
+        width: 100%;
+        -webkit-appearance: none;
+        height: 6px;
+        background: var(--bg-hover);
+        border-radius: 3px;
+        outline: none;
+    }
+
+    .setting-range::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        width: 18px;
+        height: 18px;
+        background: var(--accent-blue);
+        border-radius: 50%;
+        cursor: pointer;
+    }
+
+    .range-labels {
+        display: flex;
+        justify-content: space-between;
+        font-size: 0.75rem;
+        color: var(--text-muted);
+        margin-top: 0.5rem;
+    }
+
+    .range-labels span:nth-child(2) {
+        font-weight: 600;
+        color: var(--accent-blue);
+    }
+
+    .setting-toggle {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .toggle {
+        position: relative;
+        display: inline-block;
+        width: 48px;
+        height: 26px;
+    }
+
+    .toggle input {
+        opacity: 0;
+        width: 0;
+        height: 0;
+    }
+
+    .toggle-slider {
+        position: absolute;
+        cursor: pointer;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: var(--bg-hover);
+        border: 1px solid var(--border-color);
+        transition: 0.3s;
+        border-radius: 26px;
+    }
+
+    .toggle-slider:before {
+        position: absolute;
+        content: "";
+        height: 18px;
+        width: 18px;
+        left: 3px;
+        bottom: 3px;
+        background-color: var(--text-muted);
+        transition: 0.3s;
+        border-radius: 50%;
+    }
+
+    input:checked + .toggle-slider {
+        background-color: var(--accent-green);
+        border-color: var(--accent-green);
+    }
+
+    input:checked + .toggle-slider:before {
+        transform: translateX(22px);
+        background-color: white;
+    }
+
+    .button-group {
+        display: flex;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+    }
+
+    @media (max-width: 1200px) {
+        .settings-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Toggle password visibility
+    function togglePassword(inputId) {
+        const input = document.getElementById(inputId);
+        const icon = input.parentElement.querySelector('i');
+
+        if (input.type === 'password') {
+            input.type = 'text';
+            icon.classList.remove('fa-eye');
+            icon.classList.add('fa-eye-slash');
+        } else {
+            input.type = 'password';
+            icon.classList.remove('fa-eye-slash');
+            icon.classList.add('fa-eye');
+        }
+    }
+
+    // Update range value display
+    document.getElementById('min-score').addEventListener('input', function() {
+        document.getElementById('min-score-value').textContent = this.value;
+    });
+
+    // Save settings
+    function saveSettings() {
+        const settings = {
+            api: {
+                polymarket: document.getElementById('polymarket-api').value,
+                kalshi: document.getElementById('kalshi-api').value,
+                twitter: document.getElementById('twitter-token').value,
+                reddit: document.getElementById('reddit-client').value
+            },
+            trading: {
+                positionSize: document.getElementById('position-size').value,
+                kellyFraction: document.getElementById('kelly-fraction').value,
+                minScore: document.getElementById('min-score').value,
+                minEv: document.getElementById('min-ev').value
+            },
+            notifications: {
+                highValue: document.getElementById('notify-high-value').checked,
+                sentiment: document.getElementById('notify-sentiment').checked,
+                news: document.getElementById('notify-news').checked,
+                price: document.getElementById('notify-price').checked
+            },
+            display: {
+                refreshInterval: document.getElementById('refresh-interval').value,
+                resultsPerPage: document.getElementById('results-per-page').value,
+                timezone: document.getElementById('timezone').value
+            }
+        };
+
+        // Save to localStorage
+        localStorage.setItem('predictflow-settings', JSON.stringify(settings));
+
+        // Show success message
+        alert('Settings saved successfully!');
+    }
+
+    // Load settings
+    function loadSettings() {
+        const saved = localStorage.getItem('predictflow-settings');
+        if (!saved) return;
+
+        try {
+            const settings = JSON.parse(saved);
+
+            // API
+            if (settings.api) {
+                document.getElementById('polymarket-api').value = settings.api.polymarket || '';
+                document.getElementById('kalshi-api').value = settings.api.kalshi || '';
+                document.getElementById('twitter-token').value = settings.api.twitter || '';
+                document.getElementById('reddit-client').value = settings.api.reddit || '';
+            }
+
+            // Trading
+            if (settings.trading) {
+                document.getElementById('position-size').value = settings.trading.positionSize || 100;
+                document.getElementById('kelly-fraction').value = settings.trading.kellyFraction || 25;
+                document.getElementById('min-score').value = settings.trading.minScore || 0.5;
+                document.getElementById('min-score-value').textContent = settings.trading.minScore || 0.5;
+                document.getElementById('min-ev').value = settings.trading.minEv || 5;
+            }
+
+            // Notifications
+            if (settings.notifications) {
+                document.getElementById('notify-high-value').checked = settings.notifications.highValue !== false;
+                document.getElementById('notify-sentiment').checked = settings.notifications.sentiment !== false;
+                document.getElementById('notify-news').checked = settings.notifications.news !== false;
+                document.getElementById('notify-price').checked = settings.notifications.price === true;
+            }
+
+            // Display
+            if (settings.display) {
+                document.getElementById('refresh-interval').value = settings.display.refreshInterval || 60;
+                document.getElementById('results-per-page').value = settings.display.resultsPerPage || 20;
+                document.getElementById('timezone').value = settings.display.timezone || 'America/New_York';
+            }
+        } catch (e) {
+            console.error('Error loading settings:', e);
+        }
+    }
+
+    // Export data
+    function exportData(type) {
+        alert(`Exporting ${type} data... (Feature coming soon)`);
+    }
+
+    // Clear cache
+    function clearCache() {
+        if (confirm('Are you sure you want to clear all cached data?')) {
+            localStorage.removeItem('predictflow-cache');
+            alert('Cache cleared successfully!');
+        }
+    }
+
+    // Initialize
+    document.addEventListener('DOMContentLoaded', () => {
+        loadSettings();
+    });
+</script>
+{% endblock %}

@@ -1,0 +1,345 @@
+{% extends "base.html" %}
+
+{% block title %}Opportunities - PredictFlow{% endblock %}
+
+{% block content %}
+<!-- Top Bar -->
+<div class="topbar">
+    <h1 class="page-title">Trading Opportunities</h1>
+    <div class="topbar-actions">
+        <div class="status-indicator">
+            <span class="status-dot"></span>
+            <span id="total-count">0</span> opportunities
+        </div>
+        <button class="btn btn-secondary" onclick="refreshData()">
+            <i class="fas fa-sync-alt"></i>
+            Refresh
+        </button>
+    </div>
+</div>
+
+<!-- Page Content -->
+<div class="page-content">
+    <!-- Filters -->
+    <div class="card" style="margin-bottom: 1.5rem;">
+        <div class="card-body">
+            <div style="display: flex; gap: 1rem; flex-wrap: wrap; align-items: center;">
+                <div class="filter-group">
+                    <label style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.25rem; display: block;">
+                        Min Score
+                    </label>
+                    <select id="filter-score" class="filter-select" onchange="applyFilters()">
+                        <option value="0">All</option>
+                        <option value="0.3">0.3+</option>
+                        <option value="0.5">0.5+</option>
+                        <option value="0.7">0.7+</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.25rem; display: block;">
+                        Side
+                    </label>
+                    <select id="filter-side" class="filter-select" onchange="applyFilters()">
+                        <option value="">All</option>
+                        <option value="YES">YES</option>
+                        <option value="NO">NO</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.25rem; display: block;">
+                        Min EV
+                    </label>
+                    <select id="filter-ev" class="filter-select" onchange="applyFilters()">
+                        <option value="-100">All</option>
+                        <option value="0">0%+</option>
+                        <option value="5">5%+</option>
+                        <option value="10">10%+</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.25rem; display: block;">
+                        Sort By
+                    </label>
+                    <select id="filter-sort" class="filter-select" onchange="applyFilters()">
+                        <option value="score">Score</option>
+                        <option value="ev">Expected Value</option>
+                        <option value="confidence">Confidence</option>
+                        <option value="liquidity">Liquidity</option>
+                    </select>
+                </div>
+                <div style="flex: 1;"></div>
+                <div class="filter-group">
+                    <label style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.25rem; display: block;">
+                        Search
+                    </label>
+                    <input type="text" id="filter-search" class="filter-input" placeholder="Search markets..." onkeyup="applyFilters()">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Opportunities Table -->
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title">
+                <i class="fas fa-lightbulb" style="color: var(--accent-yellow);"></i>
+                Ranked Opportunities
+            </h3>
+            <span id="filtered-count" style="font-size: 0.85rem; color: var(--text-muted);">
+                Showing all
+            </span>
+        </div>
+        <div class="card-body" style="padding: 0;">
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th style="width: 60px;">Rank</th>
+                            <th>Market</th>
+                            <th style="width: 100px;">Score</th>
+                            <th style="width: 100px;">EV</th>
+                            <th style="width: 100px;">Confidence</th>
+                            <th style="width: 80px;">Side</th>
+                            <th style="width: 100px;">Price</th>
+                            <th style="width: 120px;">Liquidity</th>
+                            <th style="width: 180px;">Key Factors</th>
+                        </tr>
+                    </thead>
+                    <tbody id="opportunities-table">
+                        <tr>
+                            <td colspan="9" class="loading">
+                                <div class="spinner"></div>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    .filter-group {
+        min-width: 120px;
+    }
+
+    .filter-select, .filter-input {
+        width: 100%;
+        padding: 0.5rem 0.75rem;
+        background: var(--bg-hover);
+        border: 1px solid var(--border-color);
+        border-radius: 6px;
+        color: var(--text-primary);
+        font-size: 0.85rem;
+    }
+
+    .filter-select:focus, .filter-input:focus {
+        outline: none;
+        border-color: var(--accent-blue);
+    }
+
+    .filter-input {
+        min-width: 200px;
+    }
+
+    .score-display {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .score-number {
+        font-family: 'JetBrains Mono', monospace;
+        font-weight: 600;
+        min-width: 40px;
+    }
+
+    .market-name {
+        max-width: 300px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .market-id {
+        font-size: 0.7rem;
+        color: var(--text-muted);
+        font-family: 'JetBrains Mono', monospace;
+    }
+
+    .factors-list {
+        display: flex;
+        gap: 0.25rem;
+        flex-wrap: wrap;
+    }
+
+    .factor-tag {
+        font-size: 0.65rem;
+        padding: 0.15rem 0.4rem;
+        background: var(--bg-hover);
+        border-radius: 4px;
+        color: var(--text-secondary);
+    }
+
+    .opportunity-row {
+        cursor: pointer;
+        transition: background 0.2s;
+    }
+
+    .opportunity-row:hover {
+        background: var(--bg-hover);
+    }
+
+    /* Score bar colors */
+    .score-fill.high { background: var(--accent-green); }
+    .score-fill.medium { background: var(--accent-blue); }
+    .score-fill.low { background: var(--accent-yellow); }
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    let allOpportunities = [];
+
+    // Load opportunities
+    async function loadOpportunities() {
+        const data = await fetchData('/api/opportunities');
+
+        if (data) {
+            allOpportunities = data;
+            document.getElementById('total-count').textContent = data.length;
+            applyFilters();
+        }
+    }
+
+    // Apply filters
+    function applyFilters() {
+        const minScore = parseFloat(document.getElementById('filter-score').value);
+        const side = document.getElementById('filter-side').value;
+        const minEv = parseFloat(document.getElementById('filter-ev').value);
+        const sortBy = document.getElementById('filter-sort').value;
+        const search = document.getElementById('filter-search').value.toLowerCase();
+
+        let filtered = allOpportunities.filter(opp => {
+            if (opp.score < minScore) return false;
+            if (side && opp.side !== side) return false;
+            if (opp.ev < minEv) return false;
+            if (search && !opp.market_name.toLowerCase().includes(search)) return false;
+            return true;
+        });
+
+        // Sort
+        filtered.sort((a, b) => {
+            switch (sortBy) {
+                case 'ev': return b.ev - a.ev;
+                case 'confidence': return b.confidence - a.confidence;
+                case 'liquidity': return b.liquidity - a.liquidity;
+                default: return b.score - a.score;
+            }
+        });
+
+        renderTable(filtered);
+        document.getElementById('filtered-count').textContent =
+            filtered.length === allOpportunities.length
+                ? 'Showing all'
+                : `Showing ${filtered.length} of ${allOpportunities.length}`;
+    }
+
+    // Render table
+    function renderTable(opportunities) {
+        const table = document.getElementById('opportunities-table');
+
+        if (!opportunities || opportunities.length === 0) {
+            table.innerHTML = `
+                <tr>
+                    <td colspan="9" class="empty-state">
+                        <i class="fas fa-search"></i>
+                        <p>No opportunities found matching your criteria</p>
+                    </td>
+                </tr>
+            `;
+            return;
+        }
+
+        table.innerHTML = opportunities.map((opp, index) => {
+            const scoreClass = opp.score >= 0.7 ? 'high' : opp.score >= 0.4 ? 'medium' : 'low';
+
+            return `
+                <tr class="opportunity-row" onclick="showDetails('${opp.market_id}')">
+                    <td>
+                        <span style="font-family: 'JetBrains Mono', monospace; font-weight: 600; color: var(--text-muted);">
+                            #${index + 1}
+                        </span>
+                    </td>
+                    <td>
+                        <div class="market-name">${opp.market_name}</div>
+                        <div class="market-id">${opp.market_id}</div>
+                    </td>
+                    <td>
+                        <div class="score-display">
+                            <span class="score-number ${scoreClass === 'high' ? 'sentiment-bullish' : scoreClass === 'medium' ? '' : 'sentiment-bearish'}">
+                                ${opp.score.toFixed(2)}
+                            </span>
+                        </div>
+                        <div class="score-bar" style="margin-top: 4px;">
+                            <div class="score-fill ${scoreClass}" style="width: ${opp.score * 100}%;"></div>
+                        </div>
+                    </td>
+                    <td class="${opp.ev >= 0 ? 'sentiment-bullish' : 'sentiment-bearish'}" style="font-family: 'JetBrains Mono', monospace; font-weight: 600;">
+                        ${opp.ev >= 0 ? '+' : ''}${opp.ev}%
+                    </td>
+                    <td style="font-family: 'JetBrains Mono', monospace;">
+                        ${opp.confidence}%
+                    </td>
+                    <td>
+                        <span class="badge ${opp.side === 'YES' ? 'badge-green' : 'badge-red'}">
+                            ${opp.side}
+                        </span>
+                    </td>
+                    <td style="font-family: 'JetBrains Mono', monospace;">
+                        ${opp.price}c
+                    </td>
+                    <td style="font-family: 'JetBrains Mono', monospace;">
+                        $${formatNumber(opp.liquidity)}
+                    </td>
+                    <td>
+                        <div class="factors-list">
+                            ${opp.factors && opp.factors.length > 0
+                                ? opp.factors.map(f => `<span class="factor-tag">${f}</span>`).join('')
+                                : '<span class="factor-tag">-</span>'}
+                        </div>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+    }
+
+    // Show details modal (placeholder)
+    function showDetails(marketId) {
+        console.log('Show details for:', marketId);
+        // TODO: Implement detail modal
+    }
+
+    // Refresh
+    async function refreshData() {
+        const table = document.getElementById('opportunities-table');
+        table.innerHTML = `
+            <tr>
+                <td colspan="9" class="loading">
+                    <div class="spinner"></div>
+                </td>
+            </tr>
+        `;
+
+        await fetch('/api/refresh', { method: 'POST' });
+        await loadOpportunities();
+    }
+
+    // Initialize
+    document.addEventListener('DOMContentLoaded', () => {
+        loadOpportunities();
+    });
+</script>
+{% endblock %}
