@@ -30,6 +30,13 @@ from engine.data_ingestion.polymarket_collector import PolymarketCollector
 from engine.data_ingestion.kalshi_collector import KalshiCollector
 from engine.signal_generation import SignalEngine
 from engine.opportunity_scoring import OpportunityScorer
+from engine.opportunity_scoring.advanced_scorer import AdvancedOpportunityScorer
+from engine.algorithms import (
+    LiveDataValidator,
+    ArbitrageDetector,
+    MarketCorrelationAnalyzer,
+    MarketClusterer
+)
 from engine.alerts import create_default_alert_manager
 from output import ReportGenerator
 
@@ -107,19 +114,19 @@ def collect_live_data(db, sources: list, max_markets: int = 100) -> dict:
     return results
 
 
-def run_analysis(db, data: dict) -> dict:
+def run_analysis(db, data: dict, use_advanced_scoring: bool = True) -> dict:
     """
     Run signal generation and opportunity scoring.
 
     Args:
         db: Database instance
         data: Collected data
+        use_advanced_scoring: Use ML-based advanced scorer
 
     Returns:
         Analysis results
     """
     logger = get_logger("live_runner")
-    print("\n🔍 Running edge detection strategies...")
 
     # Combine all snapshots
     all_snapshots = (
@@ -127,11 +134,47 @@ def run_analysis(db, data: dict) -> dict:
         data['kalshi']['snapshots']
     )
 
+    all_order_books = (
+        data['polymarket']['order_books'] +
+        data['kalshi']['order_books']
+    )
+
     if not all_snapshots:
         print("   ⚠ No market data to analyze")
-        return {'signals': [], 'opportunities': []}
+        return {'signals': [], 'opportunities': [], 'validation': None}
 
-    # Run signal engine
+    # Step 1: Validate data quality
+    print("\n🔎 Validating data quality...")
+    validator = LiveDataValidator()
+    validation = validator.validate_batch(all_snapshots)
+    quality_score = validator.get_data_quality_score(all_snapshots)
+
+    print(f"   Data Quality Score: {quality_score:.1%}")
+    print(f"   Valid markets: {validation['valid']}/{validation['total']}")
+
+    if validation['invalid'] > 0:
+        print(f"   ⚠ {validation['invalid']} markets with data issues")
+
+    # Step 2: Check for arbitrage opportunities
+    print("\n🔄 Checking for arbitrage opportunities...")
+    arb_detector = ArbitrageDetector(min_spread=0.03)
+
+    poly_map = {s.market_id: s for s in data['polymarket']['snapshots']}
+    kalshi_map = {s.market_id: s for s in data['kalshi']['snapshots']}
+
+    arb_opportunities = arb_detector.detect_cross_platform_arb(
+        poly_map, kalshi_map, similarity_threshold=0.7
+    )
+
+    if arb_opportunities:
+        print(f"   ✓ Found {len(arb_opportunities)} potential arbitrage opportunities")
+        for arb in arb_opportunities[:3]:
+            print(f"     - Spread: {arb.spread:.1%}, Edge: {arb.edge_size:.1%}")
+    else:
+        print("   No cross-platform arbitrage detected")
+
+    # Step 3: Run signal engine
+    print("\n🔍 Running edge detection strategies...")
     engine = SignalEngine(db=db)
     print(f"   Running {len(engine.get_available_strategies())} strategies...")
 
@@ -142,27 +185,48 @@ def run_analysis(db, data: dict) -> dict:
     # Print signal breakdown
     if batch.signals_by_strategy:
         print("\n   Signals by strategy:")
-        for strategy, count in sorted(batch.signals_by_strategy.items(), key=lambda x: -x[1]):
+        for strategy, count in sorted(batch.signals_by_strategy.items(), key=lambda x: -x[1])[:5]:
             print(f"     - {strategy}: {count}")
 
-    # Score opportunities
+    # Step 4: Score opportunities
     print("\n📋 Scoring and ranking opportunities...")
 
-    scorer = OpportunityScorer(db=db)
     market_map = {s.market_id: s for s in all_snapshots}
+    order_book_map = {ob.market_id: ob for ob in all_order_books}
 
-    opportunities = scorer.score_opportunities(
-        signals=batch.signals,
-        markets=market_map,
-        top_n=50
-    )
+    if use_advanced_scoring:
+        print("   Using advanced ML-based scoring...")
+        scorer = AdvancedOpportunityScorer()
+        ranked_opps = scorer.score_opportunities(
+            signals=batch.signals,
+            markets=market_map,
+            order_books=order_book_map,
+            top_n=50
+        )
+        # Extract opportunities from RankedOpportunity objects
+        opportunities = [r.opportunity for r in ranked_opps]
+
+        # Print scoring summary
+        summary = scorer.get_scoring_summary(ranked_opps)
+        print(f"   Avg Score: {summary.get('avg_score', 0):.3f}")
+        print(f"   High Confidence: {summary.get('high_confidence_count', 0)}")
+    else:
+        scorer = OpportunityScorer(db=db)
+        opportunities = scorer.score_opportunities(
+            signals=batch.signals,
+            markets=market_map,
+            top_n=50
+        )
 
     print(f"   ✓ Ranked {len(opportunities)} opportunities")
 
     return {
         'signals': batch.signals,
         'opportunities': opportunities,
-        'batch': batch
+        'batch': batch,
+        'validation': validation,
+        'quality_score': quality_score,
+        'arbitrage': arb_opportunities
     }
 
 
