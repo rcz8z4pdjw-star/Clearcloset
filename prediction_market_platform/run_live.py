@@ -21,6 +21,7 @@ import time
 import argparse
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Dict, List, Optional
 
 # Add project root to path
 sys.path.insert(0, str(Path(__file__).parent))
@@ -38,6 +39,14 @@ from engine.algorithms import (
     MarketClusterer
 )
 from engine.alerts import create_default_alert_manager
+from engine.social import (
+    SocialFeed,
+    RedditCollector,
+    TwitterCollector,
+    SocialPost,
+    SocialSource,
+    create_social_feed,
+)
 from output import ReportGenerator
 
 from utils.logging_setup import setup_logging, get_logger
@@ -114,7 +123,130 @@ def collect_live_data(db, sources: list, max_markets: int = 100) -> dict:
     return results
 
 
-def run_analysis(db, data: dict, use_advanced_scoring: bool = True) -> dict:
+def collect_social_data(market_questions: Dict[str, str]) -> SocialFeed:
+    """
+    Collect social sentiment data from X and Reddit.
+
+    Args:
+        market_questions: Dict mapping market_id to question text
+
+    Returns:
+        SocialFeed with collected data
+    """
+    logger = get_logger("live_runner")
+    print("\n📱 Collecting social sentiment data...")
+
+    feed = create_social_feed()
+    feed.set_known_markets(market_questions)
+
+    # Collect from Reddit
+    print("   Scanning Reddit...")
+    try:
+        reddit = RedditCollector()
+        reddit_posts = list(reddit.collect_all_subreddits(sort='new', limit_per_sub=25))
+
+        # Convert to SocialPost format
+        for post_data in reddit_posts:
+            post = feed.process_reddit_post(
+                post_data,
+                post_data.get('_subreddit', 'unknown')
+            )
+            feed.ingest_posts([post])
+
+        print(f"   ✓ Reddit: {len(reddit_posts)} posts")
+    except Exception as e:
+        logger.error(f"Reddit collection failed: {e}")
+        print(f"   ✗ Reddit failed: {e}")
+
+    # Collect from Twitter/X
+    print("   Scanning X (Twitter)...")
+    try:
+        twitter = TwitterCollector()
+        tweets = list(twitter.collect_all())
+
+        # Convert to SocialPost format
+        for tweet_data in tweets:
+            post = feed.process_twitter_post(tweet_data)
+            feed.ingest_posts([post])
+
+        print(f"   ✓ Twitter: {len(tweets)} tweets")
+    except Exception as e:
+        logger.error(f"Twitter collection failed: {e}")
+        print(f"   ✗ Twitter failed: {e}")
+
+    # Get feed summary
+    summary = feed.get_feed_summary()
+    print(f"   📊 Total posts tracked: {summary['total_posts_tracked']}")
+    print(f"   📊 Topics: {summary['topics_tracked']}")
+
+    return feed
+
+
+def display_social_sentiment(feed: SocialFeed, snapshots: list):
+    """
+    Display social sentiment analysis for markets.
+
+    Args:
+        feed: SocialFeed with collected data
+        snapshots: Market snapshots to analyze
+    """
+    print("\n" + "=" * 80)
+    print("SOCIAL SENTIMENT ANALYSIS")
+    print("=" * 80)
+
+    # Get trending topics
+    trending = feed.aggregator.get_trending_topics(min_posts=3)
+
+    if trending:
+        print("\n🔥 TRENDING TOPICS:")
+        for topic, mention in trending[:5]:
+            sentiment_emoji = "🟢" if mention.avg_sentiment > 0.2 else "🔴" if mention.avg_sentiment < -0.2 else "⚪"
+            print(f"   {sentiment_emoji} {topic}: {mention.total_posts} posts, sentiment: {mention.avg_sentiment:+.2f}")
+            if mention.is_trending:
+                print(f"      📈 Volume up {mention.volume_change_1h:.1f}x in last hour")
+
+    # Get signals for top markets
+    print("\n📊 MARKET SENTIMENT SIGNALS:")
+
+    signals_generated = 0
+    for snapshot in snapshots[:10]:
+        signal = feed.get_market_signal(
+            snapshot.market_id,
+            snapshot.question,
+            snapshot.yes_price
+        )
+
+        if signal:
+            signals_generated += 1
+            direction_emoji = "🟢" if signal.direction == "bullish" else "🔴" if signal.direction == "bearish" else "⚪"
+
+            print(f"\n   {direction_emoji} {snapshot.question[:50]}...")
+            print(f"      Direction: {signal.direction.upper()} (strength: {signal.strength:.2f})")
+            print(f"      Sentiment: {signal.sentiment_score:+.2f} | Mentions: {signal.total_mentions}")
+
+            if abs(signal.divergence_score) > 0.1:
+                div_dir = "higher" if signal.divergence_score > 0 else "lower"
+                print(f"      ⚠️  Social sentiment suggests price should be {div_dir}")
+
+            print(f"      X: {signal.twitter_sentiment:+.2f} | Reddit: {signal.reddit_sentiment:+.2f}")
+
+    if signals_generated == 0:
+        print("   No social signals generated (need more mentions)")
+
+    # Show sentiment leaders
+    leaders = feed.aggregator.get_sentiment_leaders(hours=24)
+    if leaders:
+        print("\n👥 INFLUENTIAL VOICES:")
+        for topic, posts in list(leaders.items())[:3]:
+            print(f"\n   Topic: {topic}")
+            for post in posts[:2]:
+                sentiment_emoji = "🟢" if post.sentiment_score > 0.2 else "🔴" if post.sentiment_score < -0.2 else "⚪"
+                print(f"      {sentiment_emoji} @{post.author}: sentiment {post.sentiment_score:+.2f}, engagement: {post.engagement_score:.0f}")
+
+    print("\n" + "=" * 80)
+
+
+def run_analysis(db, data: dict, use_advanced_scoring: bool = True, social_feed: SocialFeed = None) -> dict:
     """
     Run signal generation and opportunity scoring.
 
@@ -410,6 +542,16 @@ def main():
         help='Max trades per run (default: 5)'
     )
 
+    # Social sentiment options
+    parser.add_argument(
+        '--social', action='store_true',
+        help='Enable social sentiment analysis (X and Reddit)'
+    )
+    parser.add_argument(
+        '--no-social', action='store_true',
+        help='Disable social sentiment analysis'
+    )
+
     # Other options
     parser.add_argument(
         '--verbose', '-v', action='store_true',
@@ -451,6 +593,13 @@ def main():
     else:
         print("📚 Mode: Research Only")
 
+    # Social sentiment enabled by default, can be disabled with --no-social
+    enable_social = args.social or not args.no_social
+    if enable_social:
+        print("📱 Social Sentiment: Enabled (X + Reddit)")
+    else:
+        print("📱 Social Sentiment: Disabled")
+
     # Initialize
     db = get_database()
     alert_manager = create_default_alert_manager()
@@ -461,7 +610,7 @@ def main():
         print(f"CYCLE START: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')} UTC")
         print('='*80)
 
-        # Step 1: Collect data
+        # Step 1: Collect market data
         data = collect_live_data(db, sources, args.max_markets)
 
         total = len(data['polymarket']['snapshots']) + len(data['kalshi']['snapshots'])
@@ -469,10 +618,22 @@ def main():
             print("\n⚠️  No data collected. Check API connectivity.")
             return
 
-        # Step 2: Run analysis
-        results = run_analysis(db, data)
+        all_snapshots = data['polymarket']['snapshots'] + data['kalshi']['snapshots']
 
-        # Step 3: Display opportunities
+        # Step 2: Collect social sentiment data
+        social_feed = None
+        if enable_social:
+            market_questions = {s.market_id: s.question for s in all_snapshots}
+            social_feed = collect_social_data(market_questions)
+
+        # Step 3: Run analysis
+        results = run_analysis(db, data, social_feed=social_feed)
+
+        # Step 4: Display social sentiment analysis
+        if enable_social and social_feed:
+            display_social_sentiment(social_feed, all_snapshots)
+
+        # Step 5: Display opportunities
         if results['opportunities']:
             display_opportunities(results['opportunities'], args.top_n)
 
@@ -487,7 +648,7 @@ def main():
             # Check alerts
             alert_manager.check_opportunities(results['opportunities'])
 
-            # Step 4: Trading (if enabled)
+            # Step 6: Trading (if enabled)
             if args.trading:
                 run_trading_mode(results['opportunities'], args)
         else:
