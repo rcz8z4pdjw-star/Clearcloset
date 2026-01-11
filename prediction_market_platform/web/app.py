@@ -13,6 +13,7 @@ Access at: http://localhost:5000
 """
 
 import sys
+import os
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
@@ -24,7 +25,7 @@ import time
 
 # Try Flask import
 try:
-    from flask import Flask, render_template, jsonify, request, Response
+    from flask import Flask, render_template, jsonify, request, Response, g
     FLASK_AVAILABLE = True
 except ImportError:
     FLASK_AVAILABLE = False
@@ -42,14 +43,24 @@ from engine.portfolio import create_portfolio_optimizer, PortfolioOptimizer
 
 from utils.logging_setup import get_logger
 
+# Import security module
+from web.security import (
+    init_security, require_api_key, rate_limit, validate_json_schema,
+    get_security_config, SCHEMAS
+)
+
 logger = get_logger("web_dashboard")
+
+# Track start time for uptime calculation
+_start_time = datetime.now(timezone.utc)
 
 # Initialize Flask app
 if FLASK_AVAILABLE:
     app = Flask(__name__,
                 template_folder='templates',
                 static_folder='static')
-    app.config['SECRET_KEY'] = 'prediction-market-research-2024'
+    # Initialize security (sets secret key from environment)
+    init_security(app)
 
 
 class DashboardState:
@@ -92,8 +103,10 @@ class DashboardState:
                 recent_opps = self.db.get_recent_opportunities(limit=50)
                 if recent_opps:
                     self.opportunities = recent_opps
-            except:
-                pass
+            except AttributeError:
+                logger.debug("get_recent_opportunities not available")
+            except Exception as e:
+                logger.warning(f"Failed to get opportunities: {e}")
 
             # Get recent signals
             try:
@@ -102,8 +115,10 @@ class DashboardState:
                 )
                 if recent_signals:
                     self.signals = recent_signals
-            except:
-                pass
+            except AttributeError:
+                logger.debug("get_signals not available")
+            except Exception as e:
+                logger.warning(f"Failed to get signals: {e}")
 
             self.last_refresh = datetime.now(timezone.utc)
             logger.info("Dashboard data refreshed")
@@ -236,10 +251,16 @@ if FLASK_AVAILABLE:
         return jsonify(state.get_news_data())
 
     @app.route('/api/refresh', methods=['POST'])
+    @rate_limit(rpm=10)  # Limit refresh calls to prevent abuse
+    @require_api_key
     def api_refresh():
         """Trigger data refresh."""
-        state.refresh_data()
-        return jsonify({'status': 'ok', 'timestamp': datetime.now(timezone.utc).isoformat()})
+        try:
+            state.refresh_data()
+            return jsonify({'status': 'ok', 'timestamp': datetime.now(timezone.utc).isoformat()})
+        except Exception as e:
+            logger.error(f"Refresh error: {e}")
+            return jsonify({'status': 'error', 'message': str(e)}), 500
 
     @app.route('/api/signals')
     def api_signals():
@@ -259,14 +280,19 @@ if FLASK_AVAILABLE:
         return jsonify(signals_data)
 
     @app.route('/api/stats')
+    @rate_limit(rpm=120)
     def api_stats():
         """Get platform statistics."""
+        uptime_seconds = (datetime.now(timezone.utc) - _start_time).total_seconds()
+        uptime_hours = uptime_seconds / 3600
+
         return jsonify({
             'total_opportunities': len(state.opportunities),
             'total_signals': len(state.signals),
             'markets_tracked': len(state.market_snapshots),
             'last_refresh': state.last_refresh.isoformat() if state.last_refresh else None,
-            'uptime_hours': 0,  # TODO: Track actual uptime
+            'uptime_hours': round(uptime_hours, 2),
+            'uptime_seconds': int(uptime_seconds),
         })
 
     @app.route('/api/performance')
@@ -301,56 +327,73 @@ if FLASK_AVAILABLE:
         return jsonify(state.portfolio_optimizer.generate_report())
 
     @app.route('/api/portfolio/position-size', methods=['POST'])
+    @rate_limit(rpm=60)
+    @validate_json_schema(SCHEMAS['position_size'])
     def api_position_size():
         """Calculate optimal position size."""
         if not state.portfolio_optimizer:
-            return jsonify({'error': 'Portfolio optimizer not initialized'})
+            return jsonify({'error': 'Portfolio optimizer not initialized'}), 503
 
-        data = request.json or {}
+        # Use validated data from schema validation
+        data = g.validated_data
 
-        sizing = state.portfolio_optimizer.calculate_position_size(
-            estimated_prob=data.get('estimated_prob', 0.5),
-            market_price=data.get('market_price', 0.5),
-            market_id=data.get('market_id', ''),
-            category=data.get('category')
-        )
-
-        return jsonify(sizing)
+        try:
+            sizing = state.portfolio_optimizer.calculate_position_size(
+                estimated_prob=data.get('estimated_prob', 0.5),
+                market_price=data.get('market_price', 0.5),
+                market_id=data.get('market_id', ''),
+                category=data.get('category')
+            )
+            return jsonify(sizing)
+        except ValueError as e:
+            return jsonify({'error': 'Invalid input', 'message': str(e)}), 400
+        except Exception as e:
+            logger.error(f"Position size calculation error: {e}")
+            return jsonify({'error': 'Calculation failed', 'message': str(e)}), 500
 
     @app.route('/api/kelly', methods=['POST'])
+    @rate_limit(rpm=60)
+    @validate_json_schema(SCHEMAS['kelly'])
     def api_kelly():
         """Calculate Kelly criterion bet size."""
-        data = request.json or {}
+        # Use validated data from schema validation
+        data = g.validated_data
 
         win_prob = data.get('win_prob', 0.5)
         odds = data.get('odds', 2.0)
         bankroll = data.get('bankroll', 10000)
         kelly_mult = data.get('kelly_fraction', 0.25)
 
-        from engine.portfolio import kelly_fraction, optimal_kelly_bet
+        try:
+            from engine.portfolio import kelly_fraction as calc_kelly_fraction, optimal_kelly_bet
 
-        # Simple Kelly
-        simple_kelly = kelly_fraction(win_prob, odds - 1)
+            # Simple Kelly
+            simple_kelly = calc_kelly_fraction(win_prob, odds - 1)
 
-        # Position sizing
-        if 'market_price' in data:
-            bet_amount, side = optimal_kelly_bet(
-                bankroll=bankroll,
-                win_prob=win_prob,
-                current_price=data['market_price'],
-                kelly_multiplier=kelly_mult
-            )
-        else:
-            bet_amount = bankroll * simple_kelly * kelly_mult
-            side = "YES" if win_prob > 0.5 else "NO"
+            # Position sizing
+            if 'market_price' in data and data['market_price'] is not None:
+                bet_amount, side = optimal_kelly_bet(
+                    bankroll=bankroll,
+                    win_prob=win_prob,
+                    current_price=data['market_price'],
+                    kelly_multiplier=kelly_mult
+                )
+            else:
+                bet_amount = bankroll * simple_kelly * kelly_mult
+                side = "YES" if win_prob > 0.5 else "NO"
 
-        return jsonify({
-            'full_kelly': round(simple_kelly, 4),
-            'adjusted_kelly': round(simple_kelly * kelly_mult, 4),
-            'bet_amount': round(bet_amount, 2),
-            'suggested_side': side,
-            'edge': round((win_prob * odds) - 1, 4)
-        })
+            return jsonify({
+                'full_kelly': round(simple_kelly, 4),
+                'adjusted_kelly': round(simple_kelly * kelly_mult, 4),
+                'bet_amount': round(bet_amount, 2),
+                'suggested_side': side,
+                'edge': round((win_prob * odds) - 1, 4)
+            })
+        except ValueError as e:
+            return jsonify({'error': 'Invalid input', 'message': str(e)}), 400
+        except Exception as e:
+            logger.error(f"Kelly calculation error: {e}")
+            return jsonify({'error': 'Calculation failed', 'message': str(e)}), 500
 
 
 def run_dashboard(host: str = '0.0.0.0', port: int = 5000, debug: bool = False):

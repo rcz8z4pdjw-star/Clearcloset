@@ -31,6 +31,9 @@ from datetime import datetime, timezone
 PROJECT_ROOT = Path(__file__).parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
+# Import validators
+from utils.validators import CLIValidator
+
 
 def cmd_live(args):
     """Run live data collection and analysis."""
@@ -480,6 +483,21 @@ Examples:
 
     handler = commands.get(args.command)
     if handler:
+        # Validate arguments
+        validator = CLIValidator()
+        validation_map = {
+            'backtest': validator.validate_backtest_args,
+            'kelly': validator.validate_kelly_args,
+            'analyze': validator.validate_analyze_args,
+            'export': validator.validate_export_args,
+            'live': validator.validate_live_args,
+        }
+
+        if args.command in validation_map:
+            if not validation_map[args.command](args):
+                print(validator.get_error_message())
+                sys.exit(1)
+
         try:
             handler(args)
         except KeyboardInterrupt:
