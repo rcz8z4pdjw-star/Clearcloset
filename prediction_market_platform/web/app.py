@@ -576,6 +576,200 @@ if FLASK_AVAILABLE:
 
 
 # =============================================================================
+# API Documentation Endpoint
+# =============================================================================
+
+OPENAPI_SPEC = {
+    "openapi": "3.0.3",
+    "info": {
+        "title": "Prediction Market Research Platform API",
+        "description": "API for analyzing prediction market opportunities across Polymarket and Kalshi",
+        "version": "1.0.0",
+        "contact": {"name": "API Support"},
+        "license": {"name": "MIT"}
+    },
+    "servers": [
+        {"url": "/", "description": "Current server"}
+    ],
+    "paths": {
+        "/health": {
+            "get": {
+                "summary": "Health check",
+                "tags": ["Monitoring"],
+                "responses": {"200": {"description": "Server is healthy"}}
+            }
+        },
+        "/health/detailed": {
+            "get": {
+                "summary": "Detailed health check",
+                "tags": ["Monitoring"],
+                "responses": {"200": {"description": "Component health status"}}
+            }
+        },
+        "/metrics": {
+            "get": {
+                "summary": "Prometheus metrics",
+                "tags": ["Monitoring"],
+                "responses": {"200": {"description": "Metrics in Prometheus format"}}
+            }
+        },
+        "/ready": {
+            "get": {
+                "summary": "Readiness probe",
+                "tags": ["Monitoring"],
+                "responses": {
+                    "200": {"description": "Server is ready"},
+                    "503": {"description": "Server not ready"}
+                }
+            }
+        },
+        "/api/dashboard": {
+            "get": {
+                "summary": "Dashboard summary",
+                "tags": ["Dashboard"],
+                "responses": {"200": {"description": "Dashboard data"}}
+            }
+        },
+        "/api/opportunities": {
+            "get": {
+                "summary": "List opportunities",
+                "tags": ["Opportunities"],
+                "parameters": [
+                    {"name": "min_score", "in": "query", "schema": {"type": "number"}},
+                    {"name": "limit", "in": "query", "schema": {"type": "integer", "default": 50}}
+                ],
+                "responses": {"200": {"description": "List of opportunities"}}
+            }
+        },
+        "/api/signals": {
+            "get": {
+                "summary": "List trading signals",
+                "tags": ["Signals"],
+                "parameters": [
+                    {"name": "strategy", "in": "query", "schema": {"type": "string"}},
+                    {"name": "limit", "in": "query", "schema": {"type": "integer", "default": 100}}
+                ],
+                "responses": {"200": {"description": "List of signals"}}
+            }
+        },
+        "/api/portfolio": {
+            "get": {
+                "summary": "Portfolio state",
+                "tags": ["Portfolio"],
+                "responses": {"200": {"description": "Current portfolio state"}}
+            }
+        },
+        "/api/kelly": {
+            "post": {
+                "summary": "Calculate Kelly criterion",
+                "tags": ["Tools"],
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "required": ["win_probability"],
+                                "properties": {
+                                    "win_probability": {"type": "number", "minimum": 0, "maximum": 1},
+                                    "odds": {"type": "number", "default": 2.0},
+                                    "kelly_multiplier": {"type": "number", "default": 0.25},
+                                    "bankroll": {"type": "number", "default": 10000}
+                                }
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {"description": "Kelly calculation result"},
+                    "400": {"description": "Invalid input"}
+                }
+            }
+        },
+        "/api/export/opportunities": {
+            "get": {
+                "summary": "Export opportunities",
+                "tags": ["Export"],
+                "parameters": [
+                    {"name": "format", "in": "query", "schema": {"type": "string", "enum": ["json", "csv"]}},
+                    {"name": "limit", "in": "query", "schema": {"type": "integer", "maximum": 1000}}
+                ],
+                "responses": {"200": {"description": "Exported data"}}
+            }
+        },
+        "/api/export/signals": {
+            "get": {
+                "summary": "Export signals",
+                "tags": ["Export"],
+                "parameters": [
+                    {"name": "format", "in": "query", "schema": {"type": "string", "enum": ["json", "csv"]}},
+                    {"name": "limit", "in": "query", "schema": {"type": "integer", "maximum": 1000}}
+                ],
+                "responses": {"200": {"description": "Exported data"}}
+            }
+        },
+        "/api/export/portfolio": {
+            "get": {
+                "summary": "Export portfolio",
+                "tags": ["Export"],
+                "parameters": [
+                    {"name": "format", "in": "query", "schema": {"type": "string", "enum": ["json", "csv"]}}
+                ],
+                "responses": {"200": {"description": "Exported data"}}
+            }
+        },
+        "/api/export/performance": {
+            "get": {
+                "summary": "Export performance report",
+                "tags": ["Export"],
+                "responses": {"200": {"description": "Performance report"}}
+            }
+        }
+    },
+    "tags": [
+        {"name": "Monitoring", "description": "Health and metrics endpoints"},
+        {"name": "Dashboard", "description": "Dashboard data"},
+        {"name": "Opportunities", "description": "Market opportunities"},
+        {"name": "Signals", "description": "Trading signals"},
+        {"name": "Portfolio", "description": "Portfolio management"},
+        {"name": "Tools", "description": "Analysis tools"},
+        {"name": "Export", "description": "Data export endpoints"}
+    ]
+}
+
+if FLASK_AVAILABLE:
+    @app.route('/api/docs')
+    def api_docs():
+        """Return OpenAPI specification."""
+        return jsonify(OPENAPI_SPEC)
+
+    @app.route('/api/docs/ui')
+    def api_docs_ui():
+        """Swagger UI for API documentation."""
+        html = """
+<!DOCTYPE html>
+<html>
+<head>
+    <title>API Documentation - Prediction Market Platform</title>
+    <link rel="stylesheet" type="text/css" href="https://unpkg.com/swagger-ui-dist@5/swagger-ui.css">
+</head>
+<body>
+    <div id="swagger-ui"></div>
+    <script src="https://unpkg.com/swagger-ui-dist@5/swagger-ui-bundle.js"></script>
+    <script>
+        SwaggerUIBundle({
+            url: '/api/docs',
+            dom_id: '#swagger-ui',
+            presets: [SwaggerUIBundle.presets.apis, SwaggerUIBundle.SwaggerUIStandalonePreset],
+            layout: "BaseLayout"
+        });
+    </script>
+</body>
+</html>
+"""
+        return Response(html, mimetype='text/html')
+
+
+# =============================================================================
 # Health Check & Monitoring Endpoints
 # =============================================================================
 
@@ -858,6 +1052,9 @@ def run_dashboard(host: str = '0.0.0.0', port: int = 5000, debug: bool = False):
 ║                   /health/detailed   - Component health                      ║
 ║                   /metrics           - Prometheus metrics                    ║
 ║                   /ready             - Readiness probe                       ║
+╠══════════════════════════════════════════════════════════════════════════════╣
+║  Documentation:   /api/docs          - OpenAPI specification (JSON)          ║
+║                   /api/docs/ui       - Swagger UI                            ║
 ╚══════════════════════════════════════════════════════════════════════════════╝
     """)
 
