@@ -770,6 +770,149 @@ if FLASK_AVAILABLE:
 
 
 # =============================================================================
+# Admin/Operations Endpoints
+# =============================================================================
+
+if FLASK_AVAILABLE:
+    @app.route('/api/admin/cache/stats')
+    @rate_limit(rpm=60)
+    def cache_stats():
+        """Get cache statistics."""
+        try:
+            from engine.cache import get_cache
+            cache = get_cache()
+            return jsonify(cache.get_stats())
+        except ImportError:
+            return jsonify({'error': 'Cache module not available'}), 503
+
+    @app.route('/api/admin/cache/clear', methods=['POST'])
+    @rate_limit(rpm=10)
+    def cache_clear():
+        """Clear the cache."""
+        try:
+            from engine.cache import get_cache
+            cache = get_cache()
+            count = cache.clear()
+            return jsonify({'cleared': count, 'status': 'success'})
+        except ImportError:
+            return jsonify({'error': 'Cache module not available'}), 503
+
+    @app.route('/api/admin/backups')
+    @rate_limit(rpm=30)
+    def list_backups():
+        """List available backups."""
+        try:
+            from engine.backup import get_backup_manager
+            manager = get_backup_manager()
+            backups = manager.list_backups()
+            return jsonify({'backups': backups, 'count': len(backups)})
+        except ImportError:
+            return jsonify({'error': 'Backup module not available'}), 503
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500
+
+    @app.route('/api/admin/backups', methods=['POST'])
+    @rate_limit(rpm=5)
+    def create_backup():
+        """Create a new backup."""
+        try:
+            from engine.backup import get_backup_manager
+            manager = get_backup_manager()
+            include_data = request.json.get('include_data', True) if request.is_json else True
+            result = manager.create_backup(include_data=include_data)
+            return jsonify({'status': 'success', 'backup': result})
+        except ImportError:
+            return jsonify({'error': 'Backup module not available'}), 503
+        except Exception as e:
+            logger.error(f"Backup creation failed: {e}")
+            return jsonify({'error': str(e)}), 500
+
+    @app.route('/api/admin/backups/<backup_name>')
+    @rate_limit(rpm=30)
+    def get_backup_info(backup_name):
+        """Get information about a specific backup."""
+        try:
+            from engine.backup import get_backup_manager
+            manager = get_backup_manager()
+            info = manager.get_backup_info(backup_name)
+            if info:
+                return jsonify(info)
+            return jsonify({'error': 'Backup not found'}), 404
+        except ImportError:
+            return jsonify({'error': 'Backup module not available'}), 503
+
+    @app.route('/api/admin/backups/<backup_name>/restore', methods=['POST'])
+    @rate_limit(rpm=2)
+    def restore_backup(backup_name):
+        """Restore from a backup."""
+        try:
+            from engine.backup import get_backup_manager
+            manager = get_backup_manager()
+            result = manager.restore_backup(backup_name)
+            return jsonify({'status': 'success', 'result': result})
+        except ImportError:
+            return jsonify({'error': 'Backup module not available'}), 503
+        except FileNotFoundError:
+            return jsonify({'error': 'Backup not found'}), 404
+        except Exception as e:
+            logger.error(f"Restore failed: {e}")
+            return jsonify({'error': str(e)}), 500
+
+    @app.route('/api/admin/alerts/history')
+    @rate_limit(rpm=60)
+    def get_alert_history():
+        """Get recent alert history."""
+        try:
+            from engine.alerts import create_default_alert_manager
+            manager = create_default_alert_manager()
+            limit = request.args.get('limit', 50, type=int)
+            alerts = manager.get_history(limit=limit)
+            return jsonify({
+                'alerts': [a.to_dict() if hasattr(a, 'to_dict') else str(a) for a in alerts],
+                'count': len(alerts)
+            })
+        except ImportError:
+            return jsonify({'error': 'Alerts module not available'}), 503
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500
+
+    @app.route('/api/admin/config')
+    @rate_limit(rpm=30)
+    def get_config_info():
+        """Get current configuration (non-sensitive)."""
+        try:
+            from engine.config import get_config
+            config = get_config()
+            # Return non-sensitive config info
+            return jsonify({
+                'database': {
+                    'path': config.database.path,
+                    'pool_size': config.database.pool_size,
+                },
+                'web': {
+                    'host': config.web.host,
+                    'port': config.web.port,
+                    'debug': config.web.debug,
+                    'rate_limit_rpm': config.web.rate_limit_rpm,
+                },
+                'api': {
+                    'version': config.api.version,
+                    'key_enabled': config.api.key_enabled,
+                },
+                'alerts': {
+                    'enabled': config.alerts.enabled,
+                    'min_ev_threshold': config.alerts.min_ev_threshold,
+                    'min_confidence': config.alerts.min_confidence,
+                },
+                'logging': {
+                    'level': config.logging.level,
+                }
+            })
+        except ImportError:
+            return jsonify({'error': 'Config module not available'}), 503
+
+
+# =============================================================================
 # Health Check & Monitoring Endpoints
 # =============================================================================
 

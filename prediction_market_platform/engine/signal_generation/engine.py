@@ -240,8 +240,57 @@ class SignalEngine:
         if save_to_db and all_signals:
             self._save_signals(all_signals)
 
+        # Send alerts for high-value signals
+        self._send_alerts(all_signals, markets)
+
         logger.info(f"Signal generation complete: {batch.total_signals} signals from {batch.markets_analyzed} markets")
         return batch
+
+    def _send_alerts(
+        self,
+        signals: List[StrategyResult],
+        markets: List[MarketSnapshot]
+    ) -> None:
+        """Send alerts for high-value signals."""
+        try:
+            from engine.alerts import create_default_alert_manager, Alert, AlertPriority
+            alert_manager = create_default_alert_manager()
+
+            # Build market lookup
+            market_lookup = {m.market_id: m for m in markets}
+
+            for signal in signals:
+                # Check if signal meets alert thresholds
+                ev = getattr(signal, 'expected_value', 0) or 0
+                confidence = getattr(signal, 'confidence', 0) or 0
+
+                if ev >= 0.05 and confidence >= 0.7:  # 5% EV, 70% confidence
+                    market = market_lookup.get(signal.market_id)
+                    market_title = market.title if market else signal.market_id
+
+                    priority = AlertPriority.CRITICAL if ev >= 0.15 else AlertPriority.HIGH if ev >= 0.10 else AlertPriority.MEDIUM
+
+                    alert = Alert(
+                        title=f"High-Value Signal: {signal.strategy_name}",
+                        message=f"{signal.direction.name if hasattr(signal.direction, 'name') else signal.direction} signal on '{market_title}' with {ev:.1%} expected value",
+                        priority=priority,
+                        data={
+                            'market_id': signal.market_id,
+                            'market_title': market_title,
+                            'strategy': signal.strategy_name,
+                            'expected_value': ev,
+                            'confidence': confidence,
+                            'direction': str(signal.direction),
+                            'strength': getattr(signal, 'strength', 0),
+                        }
+                    )
+                    alert_manager.send(alert)
+                    logger.debug(f"Alert sent for signal: {signal.strategy_name} on {signal.market_id}")
+
+        except ImportError:
+            logger.debug("Alert system not available, skipping alerts")
+        except Exception as e:
+            logger.warning(f"Failed to send alerts: {e}")
 
     def _load_market_data(
         self,
