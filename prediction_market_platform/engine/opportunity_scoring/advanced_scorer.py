@@ -447,6 +447,37 @@ class AdvancedOpportunityScorer:
 
         return risks
 
+    def score_opportunity(
+        self,
+        snapshot: MarketSnapshot,
+        signals: Optional[List[StrategyResult]] = None,
+        order_book: Optional[OrderBook] = None,
+        price_history: Optional[PriceHistory] = None
+    ) -> Optional[RankedOpportunity]:
+        """
+        Score a single opportunity.
+
+        Convenience method for scoring individual markets.
+
+        Args:
+            snapshot: Market snapshot
+            signals: List of signals for this market
+            order_book: Order book data
+            price_history: Price history
+
+        Returns:
+            Ranked opportunity or None
+        """
+        if signals is None:
+            signals = []
+
+        return self._score_market(
+            snapshot=snapshot,
+            signals=signals,
+            order_book=order_book,
+            price_history=price_history
+        )
+
     def get_scoring_summary(
         self,
         opportunities: List[RankedOpportunity]

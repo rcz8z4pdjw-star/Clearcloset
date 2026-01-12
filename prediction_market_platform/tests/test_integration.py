@@ -227,10 +227,11 @@ class TestPerformanceTracker:
             market_id="test-market",
             strategy_name="TestStrategy",
             direction="BUY",
+            suggested_side="YES",
             strength=0.75,
             confidence=0.80,
-            expected_value=0.15,
-            market_price_at_signal=0.50
+            predicted_ev=0.15,
+            entry_price=0.50
         )
 
         tracker.record_signal(signal)
@@ -252,9 +253,15 @@ class TestPortfolioOptimizer:
 
     def test_optimizer_creation(self):
         """Test creating a portfolio optimizer."""
+        import tempfile
         from engine.portfolio import create_portfolio_optimizer
 
-        optimizer = create_portfolio_optimizer(initial_capital=10000)
+        # Use a temporary file to avoid state persistence issues
+        with tempfile.NamedTemporaryFile(suffix='.json', delete=True) as f:
+            optimizer = create_portfolio_optimizer(
+                initial_capital=10000,
+                storage_path=f.name + '_nonexistent'  # Ensure file doesn't exist
+            )
         assert optimizer is not None
         assert optimizer.cash_balance == 10000
 
@@ -299,9 +306,15 @@ class TestPortfolioOptimizer:
 
     def test_portfolio_state(self):
         """Test portfolio state tracking."""
+        import tempfile
         from engine.portfolio import create_portfolio_optimizer
 
-        optimizer = create_portfolio_optimizer(initial_capital=10000)
+        # Use a temporary file to avoid state persistence issues
+        with tempfile.NamedTemporaryFile(suffix='.json', delete=True) as f:
+            optimizer = create_portfolio_optimizer(
+                initial_capital=10000,
+                storage_path=f.name + '_nonexistent'  # Ensure file doesn't exist
+            )
         state = optimizer.get_portfolio_state()
 
         assert state.total_value == 10000

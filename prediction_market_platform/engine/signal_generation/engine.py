@@ -283,7 +283,7 @@ class SignalEngine:
         self,
         strategy_name: str,
         markets: Optional[List[MarketSnapshot]] = None
-    ) -> SignalBatch:
+    ) -> List[StrategyResult]:
         """
         Run a single strategy across markets.
 
@@ -294,18 +294,23 @@ class SignalEngine:
             markets: Markets to analyze
 
         Returns:
-            SignalBatch with results from single strategy
+            List of StrategyResult signals from the strategy
         """
-        if strategy_name not in STRATEGY_REGISTRY:
+        # Handle aliases
+        actual_name = strategy_name
+        if strategy_name == 'late_resolution':
+            actual_name = 'late_resolution_inefficiency'
+
+        if actual_name not in STRATEGY_REGISTRY:
             raise ValueError(f"Unknown strategy: {strategy_name}")
 
         # Create strategy instance
-        strategy_class = STRATEGY_REGISTRY[strategy_name]
+        strategy_class = STRATEGY_REGISTRY[actual_name]
         config = get_strategy_config(
-            'structural' if strategy_name in ['liquidity_vacuum', 'spread_exploitation', 'order_book_imbalance', 'late_resolution_inefficiency']
-            else 'behavioral' if strategy_name in ['favorite_longshot_bias', 'overreaction', 'herding', 'anchoring_bias']
+            'structural' if actual_name in ['liquidity_vacuum', 'spread_exploitation', 'order_book_imbalance', 'late_resolution_inefficiency']
+            else 'behavioral' if actual_name in ['favorite_longshot_bias', 'overreaction', 'herding', 'anchoring_bias']
             else 'informational',
-            strategy_name
+            actual_name
         )
         strategy = strategy_class(StrategyConfig(enabled=True, params=config))
 
@@ -314,9 +319,48 @@ class SignalEngine:
         self.strategies = [strategy]
 
         try:
-            return self.generate_signals(markets=markets, save_to_db=False)
+            batch = self.generate_signals(markets=markets, save_to_db=False)
+            return batch.signals
         finally:
             self.strategies = original_strategies
+
+    def get_available_strategies(self) -> List[str]:
+        """
+        Get list of available strategy names.
+
+        Returns:
+            List of strategy names that can be used
+        """
+        # Include aliases for common strategy names
+        available = list(STRATEGY_REGISTRY.keys())
+        # Add aliases
+        aliases = {
+            'late_resolution': 'late_resolution_inefficiency',
+        }
+        for alias in aliases.keys():
+            if alias not in available:
+                available.append(alias)
+        return available
+
+    def analyze_market(
+        self,
+        market: MarketSnapshot,
+        save_to_db: bool = False
+    ) -> List[StrategyResult]:
+        """
+        Analyze a single market using all enabled strategies.
+
+        This is a convenience method for analyzing individual markets.
+
+        Args:
+            market: Market snapshot to analyze
+            save_to_db: Whether to save signals to database
+
+        Returns:
+            List of StrategyResult objects (signals) for the market
+        """
+        batch = self.generate_signals(markets=[market], save_to_db=save_to_db)
+        return batch.signals
 
     def create_ensemble(
         self,
@@ -377,3 +421,8 @@ def get_strategy_descriptions() -> Dict[str, str]:
             'description': instance.description
         }
     return descriptions
+
+
+def get_available_strategy_names() -> List[str]:
+    """Get list of available strategy names."""
+    return list(STRATEGY_REGISTRY.keys())

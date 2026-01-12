@@ -199,6 +199,28 @@ class TwitterCollector:
         now = datetime.now(timezone.utc)
         query = params.get('query', '') if params else ''
 
+        # Handle user lookup endpoint
+        if '/users/by/username/' in endpoint:
+            username = endpoint.split('/')[-1]
+            return {
+                'data': {
+                    'id': f'mock_user_{hash(username) % 10000}',
+                    'username': username,
+                    'name': f'{username.title()} User',
+                    'verified': username.lower() in ['polymarket', 'kalikiofficial'],
+                    'public_metrics': {
+                        'followers_count': 10000,
+                        'following_count': 500,
+                        'tweet_count': 1000
+                    }
+                }
+            }
+
+        # Handle user tweets endpoint
+        if endpoint.startswith('/users/') and endpoint.endswith('/tweets'):
+            # Return mock tweets for user timeline
+            pass  # Fall through to default mock tweets below
+
         mock_tweets = []
 
         # Sample tweet content with varying sentiment

@@ -755,6 +755,29 @@ class SocialAggregator:
 
         return leaders
 
+    def get_market_sentiment(
+        self,
+        market_id: str,
+        hours: Optional[int] = None
+    ) -> Optional[SocialMention]:
+        """
+        Get sentiment data for a specific market.
+
+        Args:
+            market_id: Market identifier
+            hours: Lookback period
+
+        Returns:
+            SocialMention with market sentiment or None if no data
+        """
+        topic = f"market:{market_id}"
+        mention = self.get_mention_stats(topic, hours=hours)
+
+        if mention.total_posts == 0:
+            return None
+
+        return mention
+
 
 class SocialFeed:
     """

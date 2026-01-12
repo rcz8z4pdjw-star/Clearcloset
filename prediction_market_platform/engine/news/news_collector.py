@@ -209,16 +209,46 @@ class NewsAnalyzer:
         """Initialize news analyzer."""
         self.cache = {}
 
-    def analyze(self, news: NewsItem) -> NewsItem:
+    def analyze(self, news_or_text: NewsItem | str) -> NewsItem | Dict[str, Any]:
         """
         Analyze news item for category, sentiment, and impact.
 
+        Can accept either a NewsItem object or a text string.
+
         Args:
-            news: NewsItem to analyze
+            news_or_text: NewsItem to analyze, or plain text string
 
         Returns:
-            NewsItem with analysis fields populated
+            NewsItem with analysis fields populated, or dict with analysis if string input
         """
+        # Handle string input - return dict for convenience
+        if isinstance(news_or_text, str):
+            text = news_or_text.lower()
+            category = self._detect_category(text)
+            sentiment = self._analyze_sentiment(text)
+            keywords = self._extract_keywords(text)
+            is_breaking = self._is_breaking(text)
+
+            # Calculate impact score based on sentiment, category, and keywords
+            impact_score = 0.5  # Base score
+            if category != NewsCategory.OTHER:
+                impact_score += 0.2
+            if is_breaking:
+                impact_score += 0.2
+            impact_score += abs(sentiment) * 0.3
+            impact_score = min(1.0, max(0.0, impact_score))
+
+            return {
+                'text': news_or_text,
+                'category': category.value,
+                'sentiment': sentiment,
+                'keywords': keywords,
+                'is_breaking': is_breaking,
+                'impact_score': impact_score
+            }
+
+        # Handle NewsItem input
+        news = news_or_text
         text = f"{news.title} {news.summary or ''}".lower()
 
         # Determine category
@@ -458,7 +488,7 @@ class RSSCollector:
                                     continue
                             else:
                                 published = datetime.now(timezone.utc)
-                        except:
+                        except (ValueError, TypeError, AttributeError):
                             published = datetime.now(timezone.utc)
                     else:
                         published = datetime.now(timezone.utc)

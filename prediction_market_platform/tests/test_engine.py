@@ -46,7 +46,7 @@ class TestSignalEngine(unittest.TestCase):
         """Clean up."""
         try:
             os.unlink(self.temp_file.name)
-        except:
+        except (FileNotFoundError, OSError):
             pass
 
     def test_engine_initialization(self):
@@ -111,8 +111,6 @@ class TestOpportunityScorer(unittest.TestCase):
             market_id="test-123",
             market_name="Test Market",
             source=MarketSource.POLYMARKET,
-            description="Test description",
-            category="politics",
             timestamp=datetime.utcnow(),
             direction=SignalDirection.BUY_YES,
             signal_strength=0.8,
@@ -166,8 +164,6 @@ class TestOpportunityScorer(unittest.TestCase):
                 market_id=f"test-{i}",
                 market_name=f"Test Market {i}",
                 source=MarketSource.POLYMARKET,
-            description="Test description",
-            category="politics",
                 timestamp=datetime.utcnow(),
                 direction=SignalDirection.BUY_YES,
                 signal_strength=0.7,
@@ -187,8 +183,8 @@ class TestOpportunityScorer(unittest.TestCase):
             snapshots[f"test-{i}"] = MarketSnapshot(
                 market_id=f"test-{i}",
                 source=MarketSource.POLYMARKET,
-            description="Test description",
-            category="politics",
+                description="Test description",
+                category="politics",
                 question=f"Test {i}?",
                 yes_price=0.50,
                 liquidity=5000.0,
@@ -228,6 +224,7 @@ class TestFeatureExtractor(unittest.TestCase):
             no_price=0.40,
             best_bid=0.58,
             best_ask=0.62,
+            spread=0.04,  # best_ask - best_bid
             liquidity=10000.0,
             volume_24h=5000.0,
             timestamp=datetime.utcnow(),
@@ -239,8 +236,10 @@ class TestFeatureExtractor(unittest.TestCase):
 
         self.assertIsInstance(features, MarketFeatures)
         self.assertEqual(features.price, 0.60)
-        self.assertEqual(features.spread, 0.04)
-        self.assertIsNotNone(features.liquidity_score)
+        # Spread comes from snapshot.spread field
+        self.assertAlmostEqual(features.spread, 0.04, places=5)
+        # Liquidity is the total liquidity value, not a score
+        self.assertEqual(features.liquidity, 10000.0)
 
     def test_feature_with_history(self):
         """Test feature extraction with price history."""
@@ -258,6 +257,8 @@ class TestFeatureExtractor(unittest.TestCase):
         )
 
         history = PriceHistory(
+            market_id="test-123",
+            source=MarketSource.POLYMARKET,
             timestamps=[
                 datetime.utcnow() - timedelta(hours=i)
                 for i in range(24, 0, -1)
@@ -268,8 +269,10 @@ class TestFeatureExtractor(unittest.TestCase):
 
         features = extractor.extract(snapshot, price_history=history)
 
-        self.assertIsNotNone(features.momentum_1h)
-        self.assertIsNotNone(features.volatility)
+        # MarketFeatures has price_momentum, not momentum_1h
+        self.assertIsNotNone(features.price_momentum)
+        # MarketFeatures has volatility_5, not just volatility
+        self.assertIsNotNone(features.volatility_5)
 
 
 class TestTechnicalIndicators(unittest.TestCase):
@@ -451,6 +454,8 @@ class TestDataValidator(unittest.TestCase):
     def test_price_history_validation(self):
         """Test price history validation."""
         history = PriceHistory(
+            market_id="test-123",
+            source=MarketSource.POLYMARKET,
             timestamps=[
                 datetime.utcnow() - timedelta(hours=2),
                 datetime.utcnow() - timedelta(hours=1),

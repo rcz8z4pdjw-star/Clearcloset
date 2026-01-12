@@ -226,46 +226,66 @@ class PerformanceTracker:
 
     def record_signal(
         self,
-        signal_id: str,
-        strategy_name: str,
-        market_id: str,
-        direction: str,
-        suggested_side: str,
-        strength: float,
-        confidence: float,
-        predicted_ev: float,
-        entry_price: float,
-        timestamp: Optional[datetime] = None
+        signal_or_id: 'SignalRecord | str',
+        strategy_name: Optional[str] = None,
+        market_id: Optional[str] = None,
+        direction: Optional[str] = None,
+        suggested_side: Optional[str] = None,
+        strength: Optional[float] = None,
+        confidence: Optional[float] = None,
+        predicted_ev: Optional[float] = None,
+        entry_price: Optional[float] = None,
+        timestamp: Optional[datetime] = None,
+        # Alternative field names for compatibility
+        expected_value: Optional[float] = None,
+        market_price_at_signal: Optional[float] = None
     ) -> SignalRecord:
         """
         Record a new signal.
 
+        Can accept either a SignalRecord object or individual parameters.
+
         Args:
-            signal_id: Unique identifier for the signal
+            signal_or_id: SignalRecord object or unique signal ID string
             strategy_name: Name of strategy that generated it
             market_id: Market the signal is for
             direction: BUY or SELL
             suggested_side: YES or NO
             strength: Signal strength (0-1)
             confidence: Confidence level (0-1)
-            predicted_ev: Predicted expected value
-            entry_price: Price at signal generation
+            predicted_ev: Predicted expected value (or expected_value)
+            entry_price: Price at signal generation (or market_price_at_signal)
             timestamp: When signal was generated
+            expected_value: Alias for predicted_ev
+            market_price_at_signal: Alias for entry_price
 
         Returns:
             The recorded signal
         """
+        # If a SignalRecord object is passed directly
+        if isinstance(signal_or_id, SignalRecord):
+            record = signal_or_id
+            self.signals[record.signal_id] = record
+            self._save_history()
+            logger.info(f"Recorded signal {record.signal_id} from {record.strategy_name}")
+            return record
+
+        # Handle alternative field names
+        actual_predicted_ev = predicted_ev if predicted_ev is not None else expected_value or 0.0
+        actual_entry_price = entry_price if entry_price is not None else market_price_at_signal or 0.0
+
+        signal_id = signal_or_id
         record = SignalRecord(
             signal_id=signal_id,
-            strategy_name=strategy_name,
-            market_id=market_id,
+            strategy_name=strategy_name or "unknown",
+            market_id=market_id or "unknown",
             timestamp=timestamp or datetime.now(timezone.utc),
-            direction=direction,
-            suggested_side=suggested_side,
-            strength=strength,
-            confidence=confidence,
-            predicted_ev=predicted_ev,
-            entry_price=entry_price
+            direction=direction or "BUY",
+            suggested_side=suggested_side or "YES",
+            strength=strength or 0.0,
+            confidence=confidence or 0.0,
+            predicted_ev=actual_predicted_ev,
+            entry_price=actual_entry_price
         )
 
         self.signals[signal_id] = record
@@ -303,6 +323,17 @@ class PerformanceTracker:
 
         self._save_history()
         logger.info(f"Updated signal {signal_id}: {outcome}")
+
+    # Alias for record_outcome
+    def record_outcome(
+        self,
+        signal_id: str,
+        outcome: str,
+        exit_price: float,
+        resolution_time: Optional[datetime] = None
+    ):
+        """Alias for update_outcome."""
+        return self.update_outcome(signal_id, outcome, exit_price, resolution_time)
 
     def update_market_resolution(
         self,

@@ -10,7 +10,7 @@ Advanced analysis tools for:
 
 import math
 from datetime import datetime, timezone, timedelta
-from typing import List, Dict, Any, Optional, Tuple, Set
+from typing import List, Dict, Any, Optional, Tuple, Set, Union
 from dataclasses import dataclass, field
 from collections import defaultdict
 
@@ -601,6 +601,44 @@ class ArbitrageDetector:
 
         return False
 
+    def find_arbitrage(
+        self,
+        snapshots: List[MarketSnapshot],
+        polymarket_snapshots: Optional[Dict[str, MarketSnapshot]] = None,
+        kalshi_snapshots: Optional[Dict[str, MarketSnapshot]] = None
+    ) -> List[ArbitrageOpportunity]:
+        """
+        Find all arbitrage opportunities across markets.
+
+        Convenience method that combines cross-platform and related market detection.
+
+        Args:
+            snapshots: All market snapshots
+            polymarket_snapshots: Optional Polymarket-specific snapshots
+            kalshi_snapshots: Optional Kalshi-specific snapshots
+
+        Returns:
+            List of all detected arbitrage opportunities
+        """
+        opportunities = []
+
+        # If platform-specific snapshots provided, check cross-platform
+        if polymarket_snapshots and kalshi_snapshots:
+            cross_platform = self.detect_cross_platform_arb(
+                polymarket_snapshots,
+                kalshi_snapshots
+            )
+            opportunities.extend(cross_platform)
+
+        # Check related markets
+        related = self.detect_related_market_arb(snapshots)
+        opportunities.extend(related)
+
+        # Sort by edge size
+        opportunities.sort(key=lambda o: o.edge_size, reverse=True)
+
+        return opportunities
+
 
 class LiveDataValidator:
     """
@@ -766,3 +804,33 @@ class LiveDataValidator:
             scores.append(max(0, score))
 
         return sum(scores) / len(scores)
+
+    def validate(
+        self,
+        data: Any
+    ) -> Tuple[bool, List[str]]:
+        """
+        Validate data - dispatches to appropriate validation method.
+
+        This is a convenience method that accepts various data types.
+
+        Args:
+            data: Data to validate (MarketSnapshot, list of snapshots, etc.)
+
+        Returns:
+            Tuple of (is_valid, list of issues)
+        """
+        if isinstance(data, MarketSnapshot):
+            return self.validate_snapshot(data)
+        elif isinstance(data, list) and all(isinstance(d, MarketSnapshot) for d in data):
+            result = self.validate_batch(data)
+            is_valid = result['invalid'] == 0
+            issues = []
+            for market_id, market_issues in result.get('issues', {}).items():
+                issues.extend([f"{market_id}: {i}" for i in market_issues])
+            return is_valid, issues
+        else:
+            # Generic validation - check if data exists
+            if data is None:
+                return False, ["Data is None"]
+            return True, []

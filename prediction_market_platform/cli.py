@@ -168,8 +168,8 @@ def cmd_status(args):
     try:
         markets = db.get_all_markets()
         print(f"  Markets stored: {len(markets)}")
-    except:
-        print(f"  Markets stored: Unknown")
+    except Exception as e:
+        print(f"  Markets stored: Unknown (error: {e})")
 
     # Strategies
     print("\nStrategies:")

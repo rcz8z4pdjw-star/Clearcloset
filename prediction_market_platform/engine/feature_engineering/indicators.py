@@ -23,7 +23,52 @@ class TechnicalIndicators:
     """
 
     @staticmethod
-    def rsi(prices: List[float], period: int = 14) -> Optional[float]:
+    def sma(prices: List[float], period: int = 20) -> List[float]:
+        """
+        Simple Moving Average.
+
+        Args:
+            prices: List of prices
+            period: SMA period
+
+        Returns:
+            List of SMA values (length = len(prices) - period + 1)
+        """
+        if len(prices) < period:
+            return []
+
+        result = []
+        for i in range(period - 1, len(prices)):
+            window = prices[i - period + 1:i + 1]
+            result.append(sum(window) / period)
+
+        return result
+
+    @staticmethod
+    def ema(prices: List[float], period: int = 20) -> List[float]:
+        """
+        Exponential Moving Average.
+
+        Args:
+            prices: List of prices
+            period: EMA period
+
+        Returns:
+            List of EMA values (same length as prices)
+        """
+        if len(prices) < period:
+            return []
+
+        alpha = 2 / (period + 1)
+        ema_values = [prices[0]]
+
+        for i in range(1, len(prices)):
+            ema_values.append(alpha * prices[i] + (1 - alpha) * ema_values[-1])
+
+        return ema_values
+
+    @staticmethod
+    def rsi(prices: List[float], period: int = 14) -> List[float]:
         """
         Relative Strength Index adapted for probability markets.
 
@@ -37,44 +82,46 @@ class TechnicalIndicators:
             period: RSI period (default 14)
 
         Returns:
-            RSI value (0-100) or None if insufficient data
+            List of RSI values (0-100)
         """
         if len(prices) < period + 1:
-            return None
+            return []
 
-        gains = []
-        losses = []
+        rsi_values = []
 
-        for i in range(1, len(prices)):
-            change = prices[i] - prices[i - 1]
-            if change > 0:
-                gains.append(change)
-                losses.append(0)
+        for end_idx in range(period, len(prices)):
+            window_prices = prices[end_idx - period:end_idx + 1]
+
+            gains = []
+            losses = []
+
+            for i in range(1, len(window_prices)):
+                change = window_prices[i] - window_prices[i - 1]
+                if change > 0:
+                    gains.append(change)
+                    losses.append(0)
+                else:
+                    gains.append(0)
+                    losses.append(abs(change))
+
+            avg_gain = sum(gains) / period if gains else 0
+            avg_loss = sum(losses) / period if losses else 0
+
+            if avg_loss == 0:
+                rsi_values.append(100.0)
             else:
-                gains.append(0)
-                losses.append(abs(change))
+                rs = avg_gain / avg_loss
+                rsi = 100 - (100 / (1 + rs))
+                rsi_values.append(rsi)
 
-        # Use only recent period
-        gains = gains[-period:]
-        losses = losses[-period:]
-
-        avg_gain = sum(gains) / period
-        avg_loss = sum(losses) / period
-
-        if avg_loss == 0:
-            return 100
-
-        rs = avg_gain / avg_loss
-        rsi = 100 - (100 / (1 + rs))
-
-        return rsi
+        return rsi_values
 
     @staticmethod
     def bollinger_bands(
         prices: List[float],
         period: int = 20,
         std_dev: float = 2.0
-    ) -> Optional[Tuple[float, float, float]]:
+    ) -> Tuple[List[float], List[float], List[float]]:
         """
         Bollinger Bands for prediction markets.
 
@@ -87,25 +134,34 @@ class TechnicalIndicators:
             std_dev: Standard deviation multiplier
 
         Returns:
-            Tuple of (lower_band, middle_band, upper_band) or None
+            Tuple of (upper_bands, middle_bands, lower_bands) as lists
         """
         if len(prices) < period:
-            return None
+            return ([], [], [])
 
-        recent = prices[-period:]
+        upper_bands = []
+        middle_bands = []
+        lower_bands = []
 
-        # Middle band (SMA)
-        middle = sum(recent) / period
+        for i in range(period - 1, len(prices)):
+            window = prices[i - period + 1:i + 1]
 
-        # Standard deviation
-        variance = sum((p - middle) ** 2 for p in recent) / period
-        std = math.sqrt(variance)
+            # Middle band (SMA)
+            middle = sum(window) / period
 
-        # Bands
-        upper = min(middle + (std_dev * std), 0.99)  # Cap at 99%
-        lower = max(middle - (std_dev * std), 0.01)  # Floor at 1%
+            # Standard deviation
+            variance = sum((p - middle) ** 2 for p in window) / period
+            std = math.sqrt(variance)
 
-        return (lower, middle, upper)
+            # Bands
+            upper = min(middle + (std_dev * std), 0.99)  # Cap at 99%
+            lower = max(middle - (std_dev * std), 0.01)  # Floor at 1%
+
+            upper_bands.append(upper)
+            middle_bands.append(middle)
+            lower_bands.append(lower)
+
+        return (upper_bands, middle_bands, lower_bands)
 
     @staticmethod
     def macd(
