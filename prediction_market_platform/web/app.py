@@ -14,6 +14,8 @@ Access at: http://localhost:5000
 
 import sys
 import os
+import signal
+import atexit
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
@@ -22,6 +24,8 @@ from typing import Dict, List, Any, Optional
 import json
 import threading
 import time
+import csv
+from io import StringIO
 
 # Try Flask import
 try:
@@ -54,6 +58,15 @@ logger = get_logger("web_dashboard")
 # Track start time for uptime calculation
 _start_time = datetime.now(timezone.utc)
 
+# Shutdown flag for graceful shutdown
+_shutdown_event = threading.Event()
+_active_requests = 0
+_requests_lock = threading.Lock()
+
+# Request metrics
+_request_count = 0
+_request_latencies: List[float] = []
+
 # Initialize Flask app
 if FLASK_AVAILABLE:
     app = Flask(__name__,
@@ -61,6 +74,41 @@ if FLASK_AVAILABLE:
                 static_folder='static')
     # Initialize security (sets secret key from environment)
     init_security(app)
+
+    # =============================================================================
+    # Request Logging Middleware
+    # =============================================================================
+    @app.before_request
+    def before_request_handler():
+        """Track request start time and count."""
+        global _active_requests, _request_count
+        g.start_time = time.time()
+        with _requests_lock:
+            _active_requests += 1
+            _request_count += 1
+
+    @app.after_request
+    def after_request_handler(response):
+        """Log request and track latency."""
+        global _active_requests
+        # Calculate latency
+        if hasattr(g, 'start_time'):
+            latency = (time.time() - g.start_time) * 1000  # ms
+            _request_latencies.append(latency)
+            # Keep only last 1000 latencies to prevent memory growth
+            if len(_request_latencies) > 1000:
+                _request_latencies.pop(0)
+
+            # Log request details (skip health checks to reduce noise)
+            if not request.path.startswith('/health') and not request.path == '/metrics':
+                logger.info(
+                    f"{request.method} {request.path} - {response.status_code} - {latency:.2f}ms"
+                )
+
+        with _requests_lock:
+            _active_requests -= 1
+
+        return response
 
 
 class DashboardState:
@@ -397,6 +445,137 @@ if FLASK_AVAILABLE:
 
 
 # =============================================================================
+# Data Export Endpoints
+# =============================================================================
+
+if FLASK_AVAILABLE:
+    @app.route('/api/export/opportunities')
+    @rate_limit(rpm=30)
+    def export_opportunities():
+        """
+        Export opportunities data in CSV or JSON format.
+
+        Query params:
+            format: 'csv' or 'json' (default: json)
+            limit: max records (default: 100, max: 1000)
+        """
+        export_format = request.args.get('format', 'json').lower()
+        limit = min(int(request.args.get('limit', 100)), 1000)
+
+        data = state.get_opportunities_data()[:limit]
+
+        if export_format == 'csv':
+            if not data:
+                return Response('No data', mimetype='text/csv')
+
+            output = StringIO()
+            writer = csv.DictWriter(output, fieldnames=data[0].keys())
+            writer.writeheader()
+            for row in data:
+                # Convert list fields to strings
+                row_copy = row.copy()
+                for k, v in row_copy.items():
+                    if isinstance(v, list):
+                        row_copy[k] = '; '.join(str(x) for x in v)
+                writer.writerow(row_copy)
+
+            return Response(
+                output.getvalue(),
+                mimetype='text/csv',
+                headers={'Content-Disposition': 'attachment; filename=opportunities.csv'}
+            )
+
+        return jsonify(data)
+
+    @app.route('/api/export/signals')
+    @rate_limit(rpm=30)
+    def export_signals():
+        """
+        Export signals data in CSV or JSON format.
+
+        Query params:
+            format: 'csv' or 'json' (default: json)
+            limit: max records (default: 100, max: 1000)
+        """
+        export_format = request.args.get('format', 'json').lower()
+        limit = min(int(request.args.get('limit', 100)), 1000)
+
+        signals_data = [
+            {
+                'strategy': getattr(s, 'strategy_name', 'Unknown'),
+                'market_id': getattr(s, 'market_id', 'N/A'),
+                'direction': str(getattr(s, 'direction', 'N/A')),
+                'strength': round(getattr(s, 'strength', 0), 4),
+                'confidence': round(getattr(s, 'confidence', 0), 4),
+                'ev': round(getattr(s, 'expected_value', 0), 4),
+                'timestamp': getattr(s, 'timestamp', datetime.now()).isoformat() if hasattr(s, 'timestamp') else None,
+            }
+            for s in state.signals[:limit]
+        ]
+
+        if export_format == 'csv':
+            if not signals_data:
+                return Response('No data', mimetype='text/csv')
+
+            output = StringIO()
+            writer = csv.DictWriter(output, fieldnames=signals_data[0].keys())
+            writer.writeheader()
+            writer.writerows(signals_data)
+
+            return Response(
+                output.getvalue(),
+                mimetype='text/csv',
+                headers={'Content-Disposition': 'attachment; filename=signals.csv'}
+            )
+
+        return jsonify(signals_data)
+
+    @app.route('/api/export/portfolio')
+    @rate_limit(rpm=30)
+    def export_portfolio():
+        """
+        Export portfolio data in CSV or JSON format.
+
+        Query params:
+            format: 'csv' or 'json' (default: json)
+        """
+        if not state.portfolio_optimizer:
+            return jsonify({'error': 'Portfolio optimizer not initialized'}), 503
+
+        export_format = request.args.get('format', 'json').lower()
+        report = state.portfolio_optimizer.generate_report()
+
+        if export_format == 'csv':
+            positions = report.get('positions', [])
+            if not positions:
+                return Response('No positions', mimetype='text/csv')
+
+            output = StringIO()
+            writer = csv.DictWriter(output, fieldnames=positions[0].keys())
+            writer.writeheader()
+            writer.writerows(positions)
+
+            return Response(
+                output.getvalue(),
+                mimetype='text/csv',
+                headers={'Content-Disposition': 'attachment; filename=portfolio.csv'}
+            )
+
+        return jsonify(report)
+
+    @app.route('/api/export/performance')
+    @rate_limit(rpm=30)
+    def export_performance():
+        """
+        Export performance report in JSON format.
+        """
+        if not state.performance_tracker:
+            return jsonify({'error': 'Performance tracker not initialized'}), 503
+
+        return jsonify(state.performance_tracker.generate_report())
+
+
+# =============================================================================
 # Health Check & Monitoring Endpoints
 # =============================================================================
 
@@ -500,6 +679,32 @@ if FLASK_AVAILABLE:
         metrics_text.append(f'# TYPE pm_markets_count gauge')
         metrics_text.append(f'pm_markets_count {len(state.market_snapshots)}')
 
+        # Request metrics
+        metrics_text.append(f'# HELP pm_request_count_total Total number of HTTP requests')
+        metrics_text.append(f'# TYPE pm_request_count_total counter')
+        metrics_text.append(f'pm_request_count_total {_request_count}')
+
+        metrics_text.append(f'# HELP pm_active_requests Number of currently active requests')
+        metrics_text.append(f'# TYPE pm_active_requests gauge')
+        metrics_text.append(f'pm_active_requests {_active_requests}')
+
+        # Latency metrics
+        if _request_latencies:
+            avg_latency = sum(_request_latencies) / len(_request_latencies)
+            max_latency = max(_request_latencies)
+            sorted_latencies = sorted(_request_latencies)
+            p50 = sorted_latencies[len(sorted_latencies) // 2]
+            p95 = sorted_latencies[int(len(sorted_latencies) * 0.95)]
+            p99 = sorted_latencies[int(len(sorted_latencies) * 0.99)]
+
+            metrics_text.append(f'# HELP pm_request_latency_ms Request latency in milliseconds')
+            metrics_text.append(f'# TYPE pm_request_latency_ms summary')
+            metrics_text.append(f'pm_request_latency_ms{{quantile="0.5"}} {p50:.2f}')
+            metrics_text.append(f'pm_request_latency_ms{{quantile="0.95"}} {p95:.2f}')
+            metrics_text.append(f'pm_request_latency_ms{{quantile="0.99"}} {p99:.2f}')
+            metrics_text.append(f'pm_request_latency_avg_ms {avg_latency:.2f}')
+            metrics_text.append(f'pm_request_latency_max_ms {max_latency:.2f}')
+
         return Response('\n'.join(metrics_text), mimetype='text/plain')
 
     @app.route('/ready')
@@ -522,6 +727,74 @@ if FLASK_AVAILABLE:
         })
 
 
+def graceful_shutdown(signum, frame):
+    """
+    Handle graceful shutdown on SIGTERM/SIGINT.
+
+    Waits for active requests to complete before exiting.
+    """
+    global _shutdown_event
+    signal_name = signal.Signals(signum).name if hasattr(signal, 'Signals') else str(signum)
+    logger.info(f"Received {signal_name}, initiating graceful shutdown...")
+    print(f"\n[Shutdown] Received {signal_name}, shutting down gracefully...")
+
+    _shutdown_event.set()
+
+    # Wait for active requests to complete (max 30 seconds)
+    shutdown_timeout = 30
+    start_time = time.time()
+    while _active_requests > 0 and (time.time() - start_time) < shutdown_timeout:
+        remaining = _active_requests
+        logger.info(f"Waiting for {remaining} active request(s) to complete...")
+        print(f"[Shutdown] Waiting for {remaining} active request(s)...")
+        time.sleep(0.5)
+
+    if _active_requests > 0:
+        logger.warning(f"Timeout reached with {_active_requests} active requests, forcing shutdown")
+        print(f"[Shutdown] Timeout reached, forcing shutdown")
+    else:
+        logger.info("All requests completed, shutting down cleanly")
+        print("[Shutdown] Clean shutdown complete")
+
+    # Cleanup
+    cleanup_resources()
+    sys.exit(0)
+
+
+def cleanup_resources():
+    """Clean up resources on shutdown."""
+    logger.info("Cleaning up resources...")
+    try:
+        # Close database connections
+        if state.db:
+            if hasattr(state.db, 'close'):
+                state.db.close()
+            logger.info("Database connection closed")
+
+        # Persist portfolio state
+        if state.portfolio_optimizer:
+            try:
+                state.portfolio_optimizer.save_state()
+                logger.info("Portfolio state saved")
+            except Exception as e:
+                logger.warning(f"Failed to save portfolio state: {e}")
+
+        # Persist performance data
+        if state.performance_tracker:
+            try:
+                state.performance_tracker.save()
+                logger.info("Performance data saved")
+            except Exception as e:
+                logger.warning(f"Failed to save performance data: {e}")
+
+    except Exception as e:
+        logger.error(f"Error during cleanup: {e}")
+
+
+# Register cleanup on exit
+atexit.register(cleanup_resources)
+
+
 def run_dashboard(host: str = '0.0.0.0', port: int = 5000, debug: bool = False):
     """
     Run the web dashboard.
@@ -535,14 +808,21 @@ def run_dashboard(host: str = '0.0.0.0', port: int = 5000, debug: bool = False):
         print("Flask is required. Install with: pip install flask")
         return
 
+    # Register signal handlers for graceful shutdown
+    signal.signal(signal.SIGTERM, graceful_shutdown)
+    signal.signal(signal.SIGINT, graceful_shutdown)
+
     # Initial data load
     print("Loading initial data...")
     state.refresh_data()
 
     # Start background refresh thread
     def background_refresh():
-        while True:
-            time.sleep(state.refresh_interval)
+        while not _shutdown_event.is_set():
+            # Use wait with timeout to allow checking shutdown event
+            _shutdown_event.wait(timeout=state.refresh_interval)
+            if _shutdown_event.is_set():
+                break
             try:
                 state.refresh_data()
             except Exception as e:
@@ -553,31 +833,31 @@ def run_dashboard(host: str = '0.0.0.0', port: int = 5000, debug: bool = False):
 
     print(f"""
 ╔══════════════════════════════════════════════════════════════════════════════╗
-║                                                                              ║
 ║              PREDICTION MARKET RESEARCH DASHBOARD                            ║
-║                                                                              ║
-║  Access the dashboard at: http://{host}:{port}                              ║
-║                                                                              ║
-║  Pages:                                                                      ║
-║    /                  - Main dashboard                                       ║
-║    /opportunities     - View opportunities                                   ║
-║    /signals           - Trading signals                                      ║
-║    /social            - Social sentiment                                     ║
-║    /news              - News and events                                      ║
-║    /portfolio         - Portfolio tracking                                   ║
-║    /settings          - Configuration                                        ║
-║                                                                              ║
-║  API Endpoints:                                                              ║
-║    /api/dashboard     - Dashboard summary                                    ║
-║    /api/opportunities - Opportunities data                                   ║
-║    /api/signals       - Trading signals                                      ║
-║    /api/social        - Social data                                          ║
-║    /api/news          - News data                                            ║
-║    /api/performance   - Performance tracking                                 ║
-║    /api/portfolio     - Portfolio state                                      ║
-║    /api/kelly         - Kelly criterion calculator (POST)                    ║
-║    /api/refresh       - Trigger refresh (POST)                               ║
-║                                                                              ║
+║  Access at: http://{host}:{port}                                            ║
+╠══════════════════════════════════════════════════════════════════════════════╣
+║  Pages:           /                  - Main dashboard                        ║
+║                   /opportunities     - View opportunities                    ║
+║                   /signals           - Trading signals                       ║
+║                   /social            - Social sentiment                      ║
+║                   /news              - News and events                       ║
+║                   /portfolio         - Portfolio tracking                    ║
+╠══════════════════════════════════════════════════════════════════════════════╣
+║  API:             /api/dashboard     - Dashboard summary                     ║
+║                   /api/opportunities - Opportunities data                    ║
+║                   /api/signals       - Trading signals                       ║
+║                   /api/portfolio     - Portfolio state                       ║
+║                   /api/kelly         - Kelly calculator (POST)               ║
+╠══════════════════════════════════════════════════════════════════════════════╣
+║  Export:          /api/export/opportunities?format=csv                       ║
+║                   /api/export/signals?format=csv                             ║
+║                   /api/export/portfolio?format=csv                           ║
+║                   /api/export/performance                                    ║
+╠══════════════════════════════════════════════════════════════════════════════╣
+║  Monitoring:      /health            - Basic health check                    ║
+║                   /health/detailed   - Component health                      ║
+║                   /metrics           - Prometheus metrics                    ║
+║                   /ready             - Readiness probe                       ║
 ╚══════════════════════════════════════════════════════════════════════════════╝
     """)
 
