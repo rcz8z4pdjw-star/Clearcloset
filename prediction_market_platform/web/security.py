@@ -298,7 +298,7 @@ def add_security_headers(response):
         return response
 
     # Prevent clickjacking
-    response.headers['X-Frame-Options'] = 'SAMEORIGIN'
+    response.headers['X-Frame-Options'] = 'DENY'
 
     # XSS protection
     response.headers['X-XSS-Protection'] = '1; mode=block'
@@ -309,15 +309,44 @@ def add_security_headers(response):
     # Referrer policy
     response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
 
-    # Content Security Policy (adjust as needed)
-    response.headers['Content-Security-Policy'] = (
-        "default-src 'self'; "
-        "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net; "
-        "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
-        "img-src 'self' data: https:; "
-        "font-src 'self' https://cdn.jsdelivr.net; "
-        "connect-src 'self'"
+    # Permissions policy - restrict browser features
+    response.headers['Permissions-Policy'] = (
+        'geolocation=(), microphone=(), camera=(), '
+        'payment=(), usb=(), magnetometer=(), gyroscope=()'
     )
+
+    # Strict Transport Security (HSTS) - for HTTPS deployments
+    # Uncomment in production with HTTPS
+    # response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
+
+    # Content Security Policy - tightened for production
+    # Note: 'unsafe-inline' is needed for inline scripts/styles in templates
+    # In production, consider using nonce-based CSP
+    is_production = os.environ.get('FLASK_ENV', 'development') == 'production'
+
+    if is_production:
+        # Stricter CSP for production
+        response.headers['Content-Security-Policy'] = (
+            "default-src 'self'; "
+            "script-src 'self' https://cdn.jsdelivr.net; "
+            "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+            "img-src 'self' data: https:; "
+            "font-src 'self' https://cdn.jsdelivr.net; "
+            "connect-src 'self'; "
+            "frame-ancestors 'none'; "
+            "base-uri 'self'; "
+            "form-action 'self'"
+        )
+    else:
+        # More permissive CSP for development (allows inline scripts for debugging)
+        response.headers['Content-Security-Policy'] = (
+            "default-src 'self'; "
+            "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+            "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+            "img-src 'self' data: https:; "
+            "font-src 'self' https://cdn.jsdelivr.net; "
+            "connect-src 'self'"
+        )
 
     return response
 
@@ -358,16 +387,25 @@ def init_security(app):
     # Set secret key from environment
     app.config['SECRET_KEY'] = config.secret_key
 
-    # Warn if using default secret key
-    if config.secret_key == os.environ.get('FLASK_SECRET_KEY'):
-        pass  # Using configured key
-    else:
+    # Check if we're in production mode
+    is_production = os.environ.get('FLASK_ENV', 'development') == 'production'
+    has_env_secret = os.environ.get('FLASK_SECRET_KEY') is not None
+
+    # Warn or fail if using default secret key
+    if not has_env_secret:
         import warnings
-        warnings.warn(
+        warning_msg = (
             "Using auto-generated Flask secret key. "
-            "Set FLASK_SECRET_KEY environment variable for production.",
-            RuntimeWarning
+            "Set FLASK_SECRET_KEY environment variable for production."
         )
+        if is_production:
+            # In production, this is a critical error
+            raise RuntimeError(
+                "FLASK_SECRET_KEY environment variable must be set in production mode. "
+                "Generate a secure key with: python -c \"import secrets; print(secrets.token_hex(32))\""
+            )
+        else:
+            warnings.warn(warning_msg, RuntimeWarning)
 
     # Register after_request handlers
     @app.after_request

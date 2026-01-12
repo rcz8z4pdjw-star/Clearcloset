@@ -396,6 +396,132 @@ if FLASK_AVAILABLE:
             return jsonify({'error': 'Calculation failed', 'message': str(e)}), 500
 
 
+# =============================================================================
+# Health Check & Monitoring Endpoints
+# =============================================================================
+
+if FLASK_AVAILABLE:
+    @app.route('/health')
+    def health_check():
+        """
+        Health check endpoint for load balancers and monitoring.
+
+        Returns basic health status without authentication.
+        """
+        return jsonify({
+            'status': 'healthy',
+            'timestamp': datetime.now(timezone.utc).isoformat()
+        })
+
+    @app.route('/health/detailed')
+    def detailed_health_check():
+        """
+        Detailed health check with component status.
+
+        Returns comprehensive health information.
+        """
+        components = {}
+
+        # Check database
+        try:
+            db = get_database()
+            markets = db.get_all_markets()
+            components['database'] = {
+                'status': 'healthy',
+                'markets_count': len(markets) if markets else 0
+            }
+        except Exception as e:
+            components['database'] = {
+                'status': 'unhealthy',
+                'error': str(e)
+            }
+
+        # Check signal engine
+        try:
+            engine = SignalEngine()
+            components['signal_engine'] = {
+                'status': 'healthy',
+                'strategies_loaded': len(engine.strategies)
+            }
+        except Exception as e:
+            components['signal_engine'] = {
+                'status': 'unhealthy',
+                'error': str(e)
+            }
+
+        # Check social feed
+        try:
+            if state.social_feed:
+                components['social_feed'] = {'status': 'healthy'}
+            else:
+                components['social_feed'] = {'status': 'not_initialized'}
+        except Exception as e:
+            components['social_feed'] = {
+                'status': 'unhealthy',
+                'error': str(e)
+            }
+
+        # Overall status
+        all_healthy = all(
+            c.get('status') in ['healthy', 'not_initialized']
+            for c in components.values()
+        )
+
+        return jsonify({
+            'status': 'healthy' if all_healthy else 'degraded',
+            'timestamp': datetime.now(timezone.utc).isoformat(),
+            'uptime_seconds': (datetime.now(timezone.utc) - _start_time).total_seconds(),
+            'components': components
+        })
+
+    @app.route('/metrics')
+    def metrics():
+        """
+        Prometheus-compatible metrics endpoint.
+
+        Returns metrics in plain text format.
+        """
+        uptime = (datetime.now(timezone.utc) - _start_time).total_seconds()
+
+        metrics_text = []
+        metrics_text.append(f'# HELP pm_uptime_seconds Time since server start')
+        metrics_text.append(f'# TYPE pm_uptime_seconds gauge')
+        metrics_text.append(f'pm_uptime_seconds {uptime:.2f}')
+
+        metrics_text.append(f'# HELP pm_opportunities_count Number of current opportunities')
+        metrics_text.append(f'# TYPE pm_opportunities_count gauge')
+        metrics_text.append(f'pm_opportunities_count {len(state.opportunities)}')
+
+        metrics_text.append(f'# HELP pm_signals_count Number of current signals')
+        metrics_text.append(f'# TYPE pm_signals_count gauge')
+        metrics_text.append(f'pm_signals_count {len(state.signals)}')
+
+        metrics_text.append(f'# HELP pm_markets_count Number of tracked markets')
+        metrics_text.append(f'# TYPE pm_markets_count gauge')
+        metrics_text.append(f'pm_markets_count {len(state.market_snapshots)}')
+
+        return Response('\n'.join(metrics_text), mimetype='text/plain')
+
+    @app.route('/ready')
+    def readiness_check():
+        """
+        Readiness check for Kubernetes-style deployments.
+
+        Returns 200 if app is ready to serve traffic.
+        """
+        # Check if initial data load is complete
+        if state.last_refresh is None:
+            return jsonify({
+                'status': 'not_ready',
+                'reason': 'Initial data load not complete'
+            }), 503
+
+        return jsonify({
+            'status': 'ready',
+            'last_refresh': state.last_refresh.isoformat() if state.last_refresh else None
+        })
+
+
 def run_dashboard(host: str = '0.0.0.0', port: int = 5000, debug: bool = False):
     """
     Run the web dashboard.
