@@ -313,6 +313,140 @@ def cmd_kelly(args):
         print(f"Bet Amount: ${args.bankroll * adjusted:,.2f}")
 
 
+def cmd_backup(args):
+    """Manage database backups."""
+    from engine.backup import get_backup_manager
+
+    manager = get_backup_manager()
+
+    if args.action == 'create':
+        print("Creating backup...")
+        result = manager.create_backup(include_data=not args.no_data)
+        print(f"Backup created: {result.get('backup_name')}")
+        print(f"Files: {', '.join(result.get('files', []))}")
+
+    elif args.action == 'list':
+        print("Available backups:\n")
+        backups = manager.list_backups()
+        if not backups:
+            print("  No backups found")
+        else:
+            for b in backups:
+                size = manager._format_size(b.get('size', 0))
+                print(f"  {b['name']}")
+                print(f"    Created: {b.get('timestamp', 'Unknown')}")
+                print(f"    Size: {size}")
+                print()
+
+    elif args.action == 'restore':
+        if not args.name:
+            print("Error: Backup name required for restore")
+            sys.exit(1)
+        print(f"Restoring from backup: {args.name}")
+        confirm = input("This will overwrite current data. Continue? [y/N]: ")
+        if confirm.lower() != 'y':
+            print("Restore cancelled")
+            return
+        result = manager.restore_backup(args.name)
+        print(f"Restore complete: {result}")
+
+    elif args.action == 'info':
+        if not args.name:
+            print("Error: Backup name required")
+            sys.exit(1)
+        info = manager.get_backup_info(args.name)
+        if info:
+            print(f"Backup: {info['name']}")
+            print(f"  Path: {info['path']}")
+            print(f"  Created: {info.get('timestamp', 'Unknown')}")
+            print(f"  Size: {info.get('size_human', 'Unknown')}")
+            print(f"  Files: {', '.join(info.get('files', []))}")
+        else:
+            print(f"Backup not found: {args.name}")
+
+
+def cmd_migrate(args):
+    """Run database migrations."""
+    from engine.migrations import run_migrations, get_migration_status
+
+    if args.status:
+        status = get_migration_status()
+        print("Database Migration Status")
+        print("=" * 40)
+        print(f"Database exists: {status['database_exists']}")
+        print(f"Current version: {status['current_version']}")
+        print(f"Latest version: {status['latest_version']}")
+        print(f"Pending migrations: {status['pending_migrations']}")
+
+        if status.get('pending'):
+            print("\nPending:")
+            for m in status['pending']:
+                print(f"  v{m['version']}: {m['description']}")
+
+        if status.get('applied_migrations'):
+            print("\nApplied:")
+            for m in status['applied_migrations'][-5:]:
+                print(f"  v{m['version']}: {m['description']} ({m['applied_at']})")
+    else:
+        print("Running database migrations...")
+        count = run_migrations()
+        if count == 0:
+            print("Database is up to date")
+        else:
+            print(f"Applied {count} migration(s)")
+
+
+def cmd_scheduler(args):
+    """Manage scheduled tasks."""
+    from engine.scheduler import TaskScheduler, create_default_scheduler
+
+    if args.action == 'status':
+        scheduler = create_default_scheduler()
+        print("Scheduler Status")
+        print("=" * 40)
+        print(f"Running: {scheduler.running}")
+        print(f"Tasks: {len(scheduler.tasks)}")
+        print()
+        for task_id, task in scheduler.tasks.items():
+            status_str = "enabled" if task.enabled else "disabled"
+            print(f"  {task.name} [{status_str}]")
+            print(f"    ID: {task_id}")
+            print(f"    Frequency: {task.frequency.value}")
+            print(f"    Last run: {task.last_run or 'Never'}")
+            print(f"    Runs: {task.run_count}, Failures: {task.failure_count}")
+            print()
+
+    elif args.action == 'start':
+        print("Starting scheduler...")
+        scheduler = create_default_scheduler()
+        scheduler.start()
+        print("Scheduler started with default tasks")
+        # Keep running
+        try:
+            while scheduler.running:
+                import time
+                time.sleep(1)
+        except KeyboardInterrupt:
+            scheduler.stop()
+            print("\nScheduler stopped")
+
+    elif args.action == 'run':
+        if not args.task:
+            print("Error: Task name required")
+            sys.exit(1)
+        scheduler = create_default_scheduler()
+        print(f"Running task: {args.task}")
+        task = scheduler.tasks.get(args.task)
+        if task:
+            result = scheduler.run_task(task)
+            print(f"Status: {result.status.value}")
+            print(f"Duration: {result.duration_seconds:.2f}s")
+            if result.error:
+                print(f"Error: {result.error}")
+        else:
+            print(f"Task not found: {args.task}")
+
+
 def cmd_export(args):
     """Export data to various formats."""
     from engine.data_ingestion import get_database
@@ -375,12 +509,19 @@ Commands:
   analyze    Analyze a specific market
   kelly      Kelly criterion calculator
   export     Export data to file
+  backup     Manage database backups
+  migrate    Run database migrations
+  scheduler  Manage scheduled tasks
 
 Examples:
   %(prog)s live --interval 300
   %(prog)s dashboard --port 8080
   %(prog)s analyze MARKET_ID
   %(prog)s kelly -p 0.65 -b 10000
+  %(prog)s backup create
+  %(prog)s backup list
+  %(prog)s migrate --status
+  %(prog)s scheduler status
         """
     )
 
@@ -462,6 +603,25 @@ Examples:
     export_parser.add_argument('--all', action='store_true',
                               help='Export everything')
 
+    # Backup command
+    backup_parser = subparsers.add_parser('backup', help='Manage backups')
+    backup_parser.add_argument('action', choices=['create', 'list', 'restore', 'info'],
+                              help='Backup action')
+    backup_parser.add_argument('--name', help='Backup name (for restore/info)')
+    backup_parser.add_argument('--no-data', action='store_true',
+                              help='Skip JSON data export (database only)')
+
+    # Migrate command
+    migrate_parser = subparsers.add_parser('migrate', help='Run database migrations')
+    migrate_parser.add_argument('--status', action='store_true',
+                               help='Show migration status only')
+
+    # Scheduler command
+    scheduler_parser = subparsers.add_parser('scheduler', help='Manage scheduled tasks')
+    scheduler_parser.add_argument('action', choices=['status', 'start', 'run'],
+                                 help='Scheduler action')
+    scheduler_parser.add_argument('--task', help='Task name (for run action)')
+
     args = parser.parse_args()
 
     if not args.command:
@@ -479,6 +639,9 @@ Examples:
         'analyze': cmd_analyze,
         'kelly': cmd_kelly,
         'export': cmd_export,
+        'backup': cmd_backup,
+        'migrate': cmd_migrate,
+        'scheduler': cmd_scheduler,
     }
 
     handler = commands.get(args.command)

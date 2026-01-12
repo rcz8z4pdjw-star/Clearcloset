@@ -911,6 +911,107 @@ if FLASK_AVAILABLE:
         except ImportError:
             return jsonify({'error': 'Config module not available'}), 503
 
+    @app.route('/api/admin/scheduler/status')
+    @rate_limit(rpm=60)
+    def scheduler_status():
+        """Get scheduler status."""
+        try:
+            from engine.scheduler import create_default_scheduler
+            scheduler = create_default_scheduler()
+            tasks_info = []
+            for task_id, task in scheduler.tasks.items():
+                tasks_info.append({
+                    'id': task_id,
+                    'name': task.name,
+                    'enabled': task.enabled,
+                    'frequency': task.frequency.value,
+                    'last_run': task.last_run.isoformat() if task.last_run else None,
+                    'run_count': task.run_count,
+                    'failure_count': task.failure_count,
+                })
+            return jsonify({
+                'running': scheduler.running,
+                'task_count': len(scheduler.tasks),
+                'tasks': tasks_info
+            })
+        except ImportError:
+            return jsonify({'error': 'Scheduler module not available'}), 503
+
+    @app.route('/api/admin/scheduler/tasks/<task_name>/run', methods=['POST'])
+    @rate_limit(rpm=10)
+    def run_scheduled_task(task_name):
+        """Run a scheduled task immediately."""
+        try:
+            from engine.scheduler import create_default_scheduler
+            scheduler = create_default_scheduler()
+            task = scheduler.tasks.get(task_name)
+            if task:
+                result = scheduler.run_task(task)
+                return jsonify({
+                    'status': 'success',
+                    'result': {
+                        'task_id': result.task_id,
+                        'status': result.status.value,
+                        'duration': result.duration_seconds,
+                        'error': result.error
+                    }
+                })
+            return jsonify({'error': 'Task not found'}), 404
+        except ImportError:
+            return jsonify({'error': 'Scheduler module not available'}), 503
+
+    @app.route('/api/admin/scheduler/tasks/<task_name>/enable', methods=['POST'])
+    @rate_limit(rpm=30)
+    def enable_scheduled_task(task_name):
+        """Enable a scheduled task."""
+        try:
+            from engine.scheduler import create_default_scheduler
+            scheduler = create_default_scheduler()
+            if task_name in scheduler.tasks:
+                scheduler.tasks[task_name].enabled = True
+                return jsonify({'status': 'enabled', 'task': task_name})
+            return jsonify({'error': 'Task not found'}), 404
+        except ImportError:
+            return jsonify({'error': 'Scheduler module not available'}), 503
+
+    @app.route('/api/admin/scheduler/tasks/<task_name>/disable', methods=['POST'])
+    @rate_limit(rpm=30)
+    def disable_scheduled_task(task_name):
+        """Disable a scheduled task."""
+        try:
+            from engine.scheduler import create_default_scheduler
+            scheduler = create_default_scheduler()
+            if task_name in scheduler.tasks:
+                scheduler.tasks[task_name].enabled = False
+                return jsonify({'status': 'disabled', 'task': task_name})
+            return jsonify({'error': 'Task not found'}), 404
+        except ImportError:
+            return jsonify({'error': 'Scheduler module not available'}), 503
+
+    @app.route('/api/admin/migrations/status')
+    @rate_limit(rpm=30)
+    def migrations_status():
+        """Get database migration status."""
+        try:
+            from engine.migrations import get_migration_status
+            return jsonify(get_migration_status())
+        except ImportError:
+            return jsonify({'error': 'Migrations module not available'}), 503
+
+    @app.route('/api/admin/migrations/run', methods=['POST'])
+    @rate_limit(rpm=5)
+    def run_migrations():
+        """Run pending database migrations."""
+        try:
+            from engine.migrations import run_migrations as do_migrations
+            count = do_migrations()
+            return jsonify({'status': 'success', 'migrations_applied': count})
+        except ImportError:
+            return jsonify({'error': 'Migrations module not available'}), 503
+        except Exception as e:
+            logger.error(f"Migration failed: {e}")
+            return jsonify({'error': str(e)}), 500
+
 
 # =============================================================================
 # Health Check & Monitoring Endpoints
