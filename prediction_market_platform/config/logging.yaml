@@ -1,0 +1,190 @@
+# ==============================================================================
+# Logging Configuration for Prediction Market Research Platform
+# ==============================================================================
+# This file configures Python's logging system with rotation and formatting.
+#
+# Usage:
+#   from utils.logging_setup import setup_from_config
+#   setup_from_config('config/logging.yaml')
+#
+# Or set environment variable: LOG_CONFIG=config/logging.yaml
+# ==============================================================================
+
+version: 1
+disable_existing_loggers: false
+
+# ------------------------------------------------------------------------------
+# Formatters
+# ------------------------------------------------------------------------------
+formatters:
+  standard:
+    format: '%(asctime)s | %(levelname)-8s | %(name)s | %(message)s'
+    datefmt: '%Y-%m-%d %H:%M:%S'
+
+  detailed:
+    format: '%(asctime)s | %(levelname)-8s | %(name)s | %(funcName)s:%(lineno)d | %(message)s'
+    datefmt: '%Y-%m-%d %H:%M:%S'
+
+  json:
+    class: logging.Formatter
+    format: '{"timestamp": "%(asctime)s", "level": "%(levelname)s", "logger": "%(name)s", "message": "%(message)s", "function": "%(funcName)s", "line": %(lineno)d}'
+    datefmt: '%Y-%m-%dT%H:%M:%S'
+
+# ------------------------------------------------------------------------------
+# Handlers
+# ------------------------------------------------------------------------------
+handlers:
+  # Console output (stdout)
+  console:
+    class: logging.StreamHandler
+    level: INFO
+    formatter: standard
+    stream: ext://sys.stdout
+
+  # Console for errors only (stderr)
+  console_error:
+    class: logging.StreamHandler
+    level: ERROR
+    formatter: standard
+    stream: ext://sys.stderr
+
+  # Main log file with rotation
+  file:
+    class: logging.handlers.RotatingFileHandler
+    level: DEBUG
+    formatter: detailed
+    filename: logs/platform.log
+    maxBytes: 104857600  # 100 MB
+    backupCount: 5
+    encoding: utf-8
+
+  # Error log file (errors only)
+  error_file:
+    class: logging.handlers.RotatingFileHandler
+    level: ERROR
+    formatter: detailed
+    filename: logs/errors.log
+    maxBytes: 52428800  # 50 MB
+    backupCount: 10
+    encoding: utf-8
+
+  # Daily rotating log
+  daily_file:
+    class: logging.handlers.TimedRotatingFileHandler
+    level: INFO
+    formatter: detailed
+    filename: logs/daily.log
+    when: midnight
+    interval: 1
+    backupCount: 30
+    encoding: utf-8
+
+  # JSON format for log aggregation
+  json_file:
+    class: logging.handlers.RotatingFileHandler
+    level: INFO
+    formatter: json
+    filename: logs/platform.json
+    maxBytes: 104857600  # 100 MB
+    backupCount: 5
+    encoding: utf-8
+
+  # Web requests log
+  web_file:
+    class: logging.handlers.RotatingFileHandler
+    level: INFO
+    formatter: detailed
+    filename: logs/web.log
+    maxBytes: 52428800  # 50 MB
+    backupCount: 5
+    encoding: utf-8
+
+  # Data collection log
+  collector_file:
+    class: logging.handlers.RotatingFileHandler
+    level: DEBUG
+    formatter: detailed
+    filename: logs/collector.log
+    maxBytes: 104857600  # 100 MB
+    backupCount: 5
+    encoding: utf-8
+
+# ------------------------------------------------------------------------------
+# Loggers
+# ------------------------------------------------------------------------------
+loggers:
+  # Root application logger
+  prediction_market:
+    level: DEBUG
+    handlers: [console, file, error_file]
+    propagate: false
+
+  # Web dashboard logger
+  web_dashboard:
+    level: INFO
+    handlers: [console, web_file, error_file]
+    propagate: false
+
+  # Flask/Werkzeug logger
+  werkzeug:
+    level: WARNING
+    handlers: [web_file]
+    propagate: false
+
+  # Data collectors
+  polymarket_collector:
+    level: DEBUG
+    handlers: [collector_file, console]
+    propagate: false
+
+  kalshi_collector:
+    level: DEBUG
+    handlers: [collector_file, console]
+    propagate: false
+
+  # Social collectors
+  twitter_collector:
+    level: INFO
+    handlers: [collector_file]
+    propagate: false
+
+  reddit_collector:
+    level: INFO
+    handlers: [collector_file]
+    propagate: false
+
+  # Strategies
+  strategies:
+    level: INFO
+    handlers: [file]
+    propagate: false
+
+  # Signal generation
+  signal_engine:
+    level: INFO
+    handlers: [file, console]
+    propagate: false
+
+  # Opportunity scoring
+  opportunity_scorer:
+    level: INFO
+    handlers: [file]
+    propagate: false
+
+  # Suppress noisy libraries
+  urllib3:
+    level: WARNING
+    handlers: [file]
+    propagate: false
+
+  requests:
+    level: WARNING
+    handlers: [file]
+    propagate: false
+
+# ------------------------------------------------------------------------------
+# Root Logger
+# ------------------------------------------------------------------------------
+root:
+  level: INFO
+  handlers: [console, file]

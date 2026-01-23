@@ -1,0 +1,618 @@
+{% extends "base.html" %}
+
+{% block title %}Social Sentiment - PredictFlow{% endblock %}
+
+{% block content %}
+<!-- Top Bar -->
+<div class="topbar">
+    <h1 class="page-title">Social Sentiment</h1>
+    <div class="topbar-actions">
+        <div class="status-indicator">
+            <span class="status-dot"></span>
+            <span>Live Monitoring</span>
+        </div>
+        <button class="btn btn-secondary" onclick="refreshSocial()">
+            <i class="fas fa-sync-alt"></i>
+            Refresh
+        </button>
+    </div>
+</div>
+
+<!-- Page Content -->
+<div class="page-content">
+    <!-- Sentiment Overview -->
+    <div class="grid grid-cols-4" style="margin-bottom: 1.5rem;">
+        <div class="stat-card">
+            <div class="stat-label">Total Posts</div>
+            <div class="stat-value" id="total-posts">-</div>
+            <div class="stat-change positive">
+                <i class="fas fa-arrow-up"></i>
+                <span>Last 24h</span>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Bullish Sentiment</div>
+            <div class="stat-value sentiment-bullish" id="bullish-count">-</div>
+            <div class="stat-change" style="color: var(--text-muted);">
+                <span id="bullish-pct">0%</span> of total
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Bearish Sentiment</div>
+            <div class="stat-value sentiment-bearish" id="bearish-count">-</div>
+            <div class="stat-change" style="color: var(--text-muted);">
+                <span id="bearish-pct">0%</span> of total
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Net Sentiment</div>
+            <div class="stat-value" id="net-sentiment">-</div>
+            <div class="stat-change" style="color: var(--text-muted);">
+                <span id="sentiment-label">Neutral</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="grid grid-cols-3" style="margin-bottom: 1.5rem;">
+        <!-- Trending Topics -->
+        <div class="card" style="grid-column: span 2;">
+            <div class="card-header">
+                <h3 class="card-title">
+                    <i class="fas fa-fire" style="color: var(--accent-yellow);"></i>
+                    Trending Topics
+                </h3>
+            </div>
+            <div class="card-body" style="padding: 0;">
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Topic</th>
+                                <th>Posts</th>
+                                <th>Sentiment</th>
+                                <th>Volume Change</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="trending-table">
+                            <tr>
+                                <td colspan="5" class="loading">
+                                    <div class="spinner"></div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Platform Breakdown -->
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">
+                    <i class="fas fa-chart-pie" style="color: var(--accent-purple);"></i>
+                    Platform Breakdown
+                </h3>
+            </div>
+            <div class="card-body">
+                <div style="height: 200px; display: flex; align-items: center; justify-content: center;">
+                    <canvas id="platform-chart"></canvas>
+                </div>
+                <div id="platform-stats" style="margin-top: 1rem;">
+                    <div class="platform-row">
+                        <span><i class="fab fa-twitter" style="color: #1DA1F2;"></i> Twitter/X</span>
+                        <span id="twitter-count">-</span>
+                    </div>
+                    <div class="platform-row">
+                        <span><i class="fab fa-reddit" style="color: #FF4500;"></i> Reddit</span>
+                        <span id="reddit-count">-</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sentiment Charts -->
+    <div class="grid grid-cols-2" style="margin-bottom: 1.5rem;">
+        <!-- Sentiment Over Time -->
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">
+                    <i class="fas fa-chart-line" style="color: var(--accent-green);"></i>
+                    Sentiment Over Time
+                </h3>
+            </div>
+            <div class="card-body">
+                <div style="height: 250px;">
+                    <canvas id="sentiment-chart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Volume Over Time -->
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">
+                    <i class="fas fa-chart-bar" style="color: var(--accent-blue);"></i>
+                    Post Volume
+                </h3>
+            </div>
+            <div class="card-body">
+                <div style="height: 250px;">
+                    <canvas id="volume-chart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Monitored Accounts & Sources -->
+    <div class="grid grid-cols-2">
+        <!-- Key Accounts -->
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">
+                    <i class="fas fa-user-check" style="color: var(--accent-blue);"></i>
+                    Monitored Accounts
+                </h3>
+            </div>
+            <div class="card-body" style="padding: 0;">
+                <div id="accounts-list" style="max-height: 300px; overflow-y: auto;">
+                    <div class="account-item">
+                        <div class="account-icon twitter">
+                            <i class="fab fa-twitter"></i>
+                        </div>
+                        <div class="account-info">
+                            <div class="account-name">@Polymarket</div>
+                            <div class="account-meta">Official Account</div>
+                        </div>
+                        <div class="account-status active">Active</div>
+                    </div>
+                    <div class="account-item">
+                        <div class="account-icon twitter">
+                            <i class="fab fa-twitter"></i>
+                        </div>
+                        <div class="account-info">
+                            <div class="account-name">@Kalshi</div>
+                            <div class="account-meta">Official Account</div>
+                        </div>
+                        <div class="account-status active">Active</div>
+                    </div>
+                    <div class="account-item">
+                        <div class="account-icon twitter">
+                            <i class="fab fa-twitter"></i>
+                        </div>
+                        <div class="account-info">
+                            <div class="account-name">@NateSilver538</div>
+                            <div class="account-meta">Political Forecasting</div>
+                        </div>
+                        <div class="account-status active">Active</div>
+                    </div>
+                    <div class="account-item">
+                        <div class="account-icon reddit">
+                            <i class="fab fa-reddit"></i>
+                        </div>
+                        <div class="account-info">
+                            <div class="account-name">r/polymarket</div>
+                            <div class="account-meta">Subreddit</div>
+                        </div>
+                        <div class="account-status active">Active</div>
+                    </div>
+                    <div class="account-item">
+                        <div class="account-icon reddit">
+                            <i class="fab fa-reddit"></i>
+                        </div>
+                        <div class="account-info">
+                            <div class="account-name">r/Kalshi</div>
+                            <div class="account-meta">Subreddit</div>
+                        </div>
+                        <div class="account-status active">Active</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Search Terms -->
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">
+                    <i class="fas fa-hashtag" style="color: var(--accent-yellow);"></i>
+                    Tracked Keywords
+                </h3>
+            </div>
+            <div class="card-body">
+                <div class="keywords-grid" id="keywords-list">
+                    <span class="keyword-tag">polymarket</span>
+                    <span class="keyword-tag">kalshi</span>
+                    <span class="keyword-tag">prediction market</span>
+                    <span class="keyword-tag">betting odds</span>
+                    <span class="keyword-tag">election odds</span>
+                    <span class="keyword-tag">#predictionmarkets</span>
+                    <span class="keyword-tag">#bettingodds</span>
+                    <span class="keyword-tag">#polymarket</span>
+                    <span class="keyword-tag">#kalshi</span>
+                    <span class="keyword-tag">#electionbetting</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    .platform-row {
+        display: flex;
+        justify-content: space-between;
+        padding: 0.5rem 0;
+        border-bottom: 1px solid var(--border-color);
+        font-size: 0.85rem;
+    }
+
+    .platform-row:last-child {
+        border-bottom: none;
+    }
+
+    .account-item {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        padding: 0.75rem 1rem;
+        border-bottom: 1px solid var(--border-color);
+    }
+
+    .account-item:hover {
+        background: var(--bg-hover);
+    }
+
+    .account-icon {
+        width: 36px;
+        height: 36px;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .account-icon.twitter {
+        background: rgba(29, 161, 242, 0.15);
+        color: #1DA1F2;
+    }
+
+    .account-icon.reddit {
+        background: rgba(255, 69, 0, 0.15);
+        color: #FF4500;
+    }
+
+    .account-info {
+        flex: 1;
+    }
+
+    .account-name {
+        font-weight: 500;
+        font-size: 0.9rem;
+    }
+
+    .account-meta {
+        font-size: 0.75rem;
+        color: var(--text-muted);
+    }
+
+    .account-status {
+        font-size: 0.75rem;
+        padding: 0.2rem 0.5rem;
+        border-radius: 4px;
+    }
+
+    .account-status.active {
+        background: var(--accent-green-dim);
+        color: var(--accent-green);
+    }
+
+    .keywords-grid {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+    }
+
+    .keyword-tag {
+        background: var(--bg-hover);
+        border: 1px solid var(--border-color);
+        padding: 0.35rem 0.75rem;
+        border-radius: 16px;
+        font-size: 0.8rem;
+        color: var(--text-secondary);
+    }
+
+    .sentiment-bar {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .sentiment-indicator {
+        width: 80px;
+        height: 6px;
+        background: var(--bg-hover);
+        border-radius: 3px;
+        overflow: hidden;
+        position: relative;
+    }
+
+    .sentiment-indicator::before {
+        content: '';
+        position: absolute;
+        left: 50%;
+        width: 1px;
+        height: 100%;
+        background: var(--text-muted);
+    }
+
+    .sentiment-fill-positive {
+        height: 100%;
+        background: var(--accent-green);
+        position: absolute;
+        left: 50%;
+    }
+
+    .sentiment-fill-negative {
+        height: 100%;
+        background: var(--accent-red);
+        position: absolute;
+        right: 50%;
+    }
+
+    .trending-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.25rem;
+        font-size: 0.7rem;
+        padding: 0.15rem 0.5rem;
+        border-radius: 10px;
+    }
+
+    .trending-badge.hot {
+        background: var(--accent-yellow-dim);
+        color: var(--accent-yellow);
+    }
+
+    .trending-badge.rising {
+        background: var(--accent-green-dim);
+        color: var(--accent-green);
+    }
+
+    .trending-badge.falling {
+        background: var(--accent-red-dim);
+        color: var(--accent-red);
+    }
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    let platformChart = null;
+    let sentimentChart = null;
+    let volumeChart = null;
+
+    // Initialize charts
+    function initCharts() {
+        // Platform Chart
+        const platformCtx = document.getElementById('platform-chart').getContext('2d');
+        platformChart = new Chart(platformCtx, {
+            type: 'doughnut',
+            data: {
+                labels: ['Twitter/X', 'Reddit'],
+                datasets: [{
+                    data: [60, 40],
+                    backgroundColor: [
+                        'rgba(29, 161, 242, 0.8)',
+                        'rgba(255, 69, 0, 0.8)'
+                    ],
+                    borderColor: 'transparent',
+                    borderWidth: 0
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: false
+                    }
+                },
+                cutout: '65%'
+            }
+        });
+
+        // Sentiment Chart
+        const sentimentCtx = document.getElementById('sentiment-chart').getContext('2d');
+        sentimentChart = new Chart(sentimentCtx, {
+            type: 'line',
+            data: {
+                labels: ['6h ago', '5h ago', '4h ago', '3h ago', '2h ago', '1h ago', 'Now'],
+                datasets: [
+                    {
+                        label: 'Bullish',
+                        data: [0.3, 0.4, 0.35, 0.5, 0.45, 0.55, 0.6],
+                        borderColor: 'rgba(0, 210, 106, 1)',
+                        backgroundColor: 'rgba(0, 210, 106, 0.1)',
+                        fill: true,
+                        tension: 0.4
+                    },
+                    {
+                        label: 'Bearish',
+                        data: [-0.2, -0.25, -0.3, -0.2, -0.15, -0.25, -0.2],
+                        borderColor: 'rgba(255, 71, 87, 1)',
+                        backgroundColor: 'rgba(255, 71, 87, 0.1)',
+                        fill: true,
+                        tension: 0.4
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: {
+                            color: '#a0a0b0',
+                            usePointStyle: true
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        grid: { color: 'rgba(42, 42, 58, 0.5)' },
+                        ticks: { color: '#6b6b7b' }
+                    },
+                    y: {
+                        grid: { color: 'rgba(42, 42, 58, 0.5)' },
+                        ticks: { color: '#6b6b7b' },
+                        min: -1,
+                        max: 1
+                    }
+                }
+            }
+        });
+
+        // Volume Chart
+        const volumeCtx = document.getElementById('volume-chart').getContext('2d');
+        volumeChart = new Chart(volumeCtx, {
+            type: 'bar',
+            data: {
+                labels: ['6h ago', '5h ago', '4h ago', '3h ago', '2h ago', '1h ago', 'Now'],
+                datasets: [{
+                    label: 'Posts',
+                    data: [45, 52, 38, 65, 58, 72, 68],
+                    backgroundColor: 'rgba(59, 130, 246, 0.8)',
+                    borderRadius: 4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false }
+                },
+                scales: {
+                    x: {
+                        grid: { display: false },
+                        ticks: { color: '#6b6b7b' }
+                    },
+                    y: {
+                        grid: { color: 'rgba(42, 42, 58, 0.5)' },
+                        ticks: { color: '#6b6b7b' }
+                    }
+                }
+            }
+        });
+    }
+
+    // Load social data
+    async function loadSocialData() {
+        const data = await fetchData('/api/social');
+
+        if (!data || !data.summary) {
+            console.log('No social data available');
+            return;
+        }
+
+        const summary = data.summary;
+
+        // Update stats
+        document.getElementById('total-posts').textContent = summary.total_posts || 0;
+        document.getElementById('bullish-count').textContent = summary.bullish_count || 0;
+        document.getElementById('bearish-count').textContent = summary.bearish_count || 0;
+
+        // Calculate percentages
+        const total = summary.total_posts || 1;
+        const bullishPct = Math.round((summary.bullish_count || 0) / total * 100);
+        const bearishPct = Math.round((summary.bearish_count || 0) / total * 100);
+        document.getElementById('bullish-pct').textContent = bullishPct + '%';
+        document.getElementById('bearish-pct').textContent = bearishPct + '%';
+
+        // Net sentiment
+        const netSentiment = (summary.avg_sentiment || 0).toFixed(2);
+        document.getElementById('net-sentiment').textContent = netSentiment;
+        document.getElementById('net-sentiment').className =
+            'stat-value ' + (netSentiment > 0 ? 'sentiment-bullish' : netSentiment < 0 ? 'sentiment-bearish' : '');
+        document.getElementById('sentiment-label').textContent =
+            netSentiment > 0.2 ? 'Bullish' : netSentiment < -0.2 ? 'Bearish' : 'Neutral';
+
+        // Platform counts
+        document.getElementById('twitter-count').textContent = summary.twitter_posts || '-';
+        document.getElementById('reddit-count').textContent = summary.reddit_posts || '-';
+
+        // Render trending
+        renderTrending(data.trending || []);
+    }
+
+    // Render trending table
+    function renderTrending(trending) {
+        const table = document.getElementById('trending-table');
+
+        if (!trending || trending.length === 0) {
+            table.innerHTML = `
+                <tr>
+                    <td colspan="5" class="empty-state">
+                        <i class="fas fa-hashtag"></i>
+                        <p>No trending topics yet</p>
+                    </td>
+                </tr>
+            `;
+            return;
+        }
+
+        table.innerHTML = trending.map(topic => {
+            const sentimentClass = topic.sentiment > 0 ? 'sentiment-bullish' : topic.sentiment < 0 ? 'sentiment-bearish' : '';
+            const statusClass = topic.volume_change > 50 ? 'hot' : topic.volume_change > 0 ? 'rising' : 'falling';
+
+            return `
+                <tr>
+                    <td>
+                        <div style="font-weight: 500;">${topic.topic}</div>
+                    </td>
+                    <td style="font-family: 'JetBrains Mono', monospace;">${topic.posts}</td>
+                    <td>
+                        <span class="${sentimentClass}" style="font-family: 'JetBrains Mono', monospace; font-weight: 500;">
+                            ${topic.sentiment >= 0 ? '+' : ''}${topic.sentiment.toFixed(2)}
+                        </span>
+                    </td>
+                    <td>
+                        <span class="${topic.volume_change >= 0 ? 'sentiment-bullish' : 'sentiment-bearish'}">
+                            ${topic.volume_change >= 0 ? '+' : ''}${topic.volume_change.toFixed(0)}%
+                        </span>
+                    </td>
+                    <td>
+                        <span class="trending-badge ${statusClass}">
+                            <i class="fas fa-${statusClass === 'hot' ? 'fire' : statusClass === 'rising' ? 'arrow-up' : 'arrow-down'}"></i>
+                            ${statusClass.charAt(0).toUpperCase() + statusClass.slice(1)}
+                        </span>
+                    </td>
+                </tr>
+            `;
+        }).join('');
+    }
+
+    // Refresh
+    async function refreshSocial() {
+        document.getElementById('trending-table').innerHTML = `
+            <tr>
+                <td colspan="5" class="loading">
+                    <div class="spinner"></div>
+                </td>
+            </tr>
+        `;
+
+        await fetch('/api/refresh', { method: 'POST' });
+        await loadSocialData();
+    }
+
+    // Initialize
+    document.addEventListener('DOMContentLoaded', () => {
+        initCharts();
+        loadSocialData();
+    });
+</script>
+{% endblock %}

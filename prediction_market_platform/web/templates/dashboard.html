@@ -1,0 +1,694 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - PredictFlow{% endblock %}
+
+{% block content %}
+<!-- Top Bar -->
+<div class="topbar">
+    <h1 class="page-title">Dashboard</h1>
+    <div class="topbar-actions">
+        <div class="status-indicator">
+            <span class="status-dot"></span>
+            <span id="status-text">Live</span>
+        </div>
+        <button class="btn btn-secondary" onclick="refreshAll()">
+            <i class="fas fa-sync-alt"></i>
+            Refresh
+        </button>
+    </div>
+</div>
+
+<!-- Page Content -->
+<div class="page-content">
+    <!-- Stats Overview -->
+    <div class="grid grid-cols-4" style="margin-bottom: 1.5rem;">
+        <div class="stat-card">
+            <div class="stat-label">Active Opportunities</div>
+            <div class="stat-value" id="stat-opps">-</div>
+            <div class="stat-change positive">
+                <i class="fas fa-arrow-up"></i>
+                <span id="stat-opps-change">+12%</span> vs. last hour
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Signals Generated</div>
+            <div class="stat-value" id="stat-signals">-</div>
+            <div class="stat-change positive">
+                <i class="fas fa-arrow-up"></i>
+                <span id="stat-signals-change">+8%</span> 24h
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Social Mentions</div>
+            <div class="stat-value" id="stat-social">-</div>
+            <div class="stat-change positive">
+                <i class="fas fa-chart-line"></i>
+                <span>Trending</span>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-label">Market Coverage</div>
+            <div class="stat-value" id="stat-markets">-</div>
+            <div class="stat-change" style="color: var(--text-muted);">
+                <i class="fas fa-globe"></i>
+                <span>Polymarket + Kalshi</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Grid -->
+    <div class="grid grid-cols-2" style="margin-bottom: 1.5rem;">
+        <!-- Top Opportunities -->
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">
+                    <i class="fas fa-fire" style="color: var(--accent-yellow);"></i>
+                    Top Opportunities
+                </h3>
+                <a href="/opportunities" class="btn btn-secondary" style="font-size: 0.75rem; padding: 0.4rem 0.75rem;">
+                    View All <i class="fas fa-arrow-right"></i>
+                </a>
+            </div>
+            <div class="card-body" style="padding: 0;">
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Market</th>
+                                <th>Score</th>
+                                <th>EV</th>
+                                <th>Side</th>
+                            </tr>
+                        </thead>
+                        <tbody id="top-opps-table">
+                            <tr>
+                                <td colspan="4" class="loading">
+                                    <div class="spinner"></div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Social Sentiment Overview -->
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">
+                    <i class="fas fa-comments" style="color: var(--accent-blue);"></i>
+                    Social Sentiment
+                </h3>
+                <a href="/social" class="btn btn-secondary" style="font-size: 0.75rem; padding: 0.4rem 0.75rem;">
+                    View All <i class="fas fa-arrow-right"></i>
+                </a>
+            </div>
+            <div class="card-body" id="social-overview">
+                <div class="loading">
+                    <div class="spinner"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Charts Row -->
+    <div class="grid grid-cols-2" style="margin-bottom: 1.5rem;">
+        <!-- Opportunity Distribution -->
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">
+                    <i class="fas fa-chart-pie" style="color: var(--accent-purple);"></i>
+                    Opportunity Distribution
+                </h3>
+            </div>
+            <div class="card-body">
+                <div style="height: 250px; display: flex; align-items: center; justify-content: center;">
+                    <canvas id="distribution-chart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Signal Strength Over Time -->
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">
+                    <i class="fas fa-chart-line" style="color: var(--accent-green);"></i>
+                    Signal Activity
+                </h3>
+            </div>
+            <div class="card-body">
+                <div style="height: 250px;">
+                    <canvas id="activity-chart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Activity & News -->
+    <div class="grid grid-cols-3">
+        <!-- Recent Signals -->
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">
+                    <i class="fas fa-signal" style="color: var(--accent-green);"></i>
+                    Recent Signals
+                </h3>
+            </div>
+            <div class="card-body" style="padding: 0;">
+                <div id="recent-signals" style="max-height: 300px; overflow-y: auto;">
+                    <div class="loading">
+                        <div class="spinner"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Breaking News -->
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">
+                    <i class="fas fa-newspaper" style="color: var(--accent-yellow);"></i>
+                    Breaking News
+                </h3>
+            </div>
+            <div class="card-body" style="padding: 0;">
+                <div id="breaking-news" style="max-height: 300px; overflow-y: auto;">
+                    <div class="loading">
+                        <div class="spinner"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Upcoming Events -->
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">
+                    <i class="fas fa-calendar" style="color: var(--accent-blue);"></i>
+                    Upcoming Events
+                </h3>
+            </div>
+            <div class="card-body" style="padding: 0;">
+                <div id="upcoming-events" style="max-height: 300px; overflow-y: auto;">
+                    <div class="loading">
+                        <div class="spinner"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    .signal-item {
+        padding: 0.75rem 1rem;
+        border-bottom: 1px solid var(--border-color);
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+    }
+
+    .signal-item:hover {
+        background: var(--bg-hover);
+    }
+
+    .signal-icon {
+        width: 32px;
+        height: 32px;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.85rem;
+    }
+
+    .signal-icon.buy {
+        background: var(--accent-green-dim);
+        color: var(--accent-green);
+    }
+
+    .signal-icon.sell {
+        background: var(--accent-red-dim);
+        color: var(--accent-red);
+    }
+
+    .signal-content {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .signal-title {
+        font-size: 0.85rem;
+        font-weight: 500;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .signal-meta {
+        font-size: 0.75rem;
+        color: var(--text-muted);
+    }
+
+    .signal-strength {
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 0.85rem;
+        font-weight: 600;
+    }
+
+    .news-item {
+        padding: 0.75rem 1rem;
+        border-bottom: 1px solid var(--border-color);
+    }
+
+    .news-item:hover {
+        background: var(--bg-hover);
+    }
+
+    .news-title {
+        font-size: 0.85rem;
+        font-weight: 500;
+        margin-bottom: 0.25rem;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+    }
+
+    .news-meta {
+        font-size: 0.7rem;
+        color: var(--text-muted);
+        display: flex;
+        gap: 0.75rem;
+    }
+
+    .event-item {
+        padding: 0.75rem 1rem;
+        border-bottom: 1px solid var(--border-color);
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+    }
+
+    .event-item:hover {
+        background: var(--bg-hover);
+    }
+
+    .event-date {
+        text-align: center;
+        background: var(--bg-hover);
+        padding: 0.5rem;
+        border-radius: 8px;
+        min-width: 48px;
+    }
+
+    .event-day {
+        font-size: 1.1rem;
+        font-weight: 700;
+        font-family: 'JetBrains Mono', monospace;
+    }
+
+    .event-month {
+        font-size: 0.65rem;
+        color: var(--text-muted);
+        text-transform: uppercase;
+    }
+
+    .event-content {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .event-title {
+        font-size: 0.85rem;
+        font-weight: 500;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .event-category {
+        font-size: 0.7rem;
+        color: var(--text-muted);
+    }
+
+    .sentiment-summary {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 1rem;
+    }
+
+    .sentiment-stat {
+        text-align: center;
+        padding: 1rem;
+        background: var(--bg-hover);
+        border-radius: 8px;
+    }
+
+    .sentiment-value {
+        font-size: 1.5rem;
+        font-weight: 700;
+        font-family: 'JetBrains Mono', monospace;
+    }
+
+    .sentiment-label {
+        font-size: 0.75rem;
+        color: var(--text-muted);
+        margin-top: 0.25rem;
+    }
+
+    .trending-topics {
+        margin-top: 1rem;
+    }
+
+    .trending-topic {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.5rem 0;
+        border-bottom: 1px solid var(--border-color);
+    }
+
+    .trending-topic:last-child {
+        border-bottom: none;
+    }
+
+    .topic-name {
+        flex: 1;
+        font-size: 0.85rem;
+    }
+
+    .topic-sentiment {
+        font-size: 0.75rem;
+        font-family: 'JetBrains Mono', monospace;
+    }
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    let distributionChart = null;
+    let activityChart = null;
+
+    // Initialize charts
+    function initCharts() {
+        // Distribution Chart
+        const distCtx = document.getElementById('distribution-chart').getContext('2d');
+        distributionChart = new Chart(distCtx, {
+            type: 'doughnut',
+            data: {
+                labels: ['High Score', 'Medium Score', 'Low Score'],
+                datasets: [{
+                    data: [35, 45, 20],
+                    backgroundColor: [
+                        'rgba(0, 210, 106, 0.8)',
+                        'rgba(59, 130, 246, 0.8)',
+                        'rgba(107, 107, 123, 0.8)'
+                    ],
+                    borderColor: 'transparent',
+                    borderWidth: 0
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: {
+                            color: '#a0a0b0',
+                            padding: 15,
+                            usePointStyle: true
+                        }
+                    }
+                },
+                cutout: '65%'
+            }
+        });
+
+        // Activity Chart
+        const actCtx = document.getElementById('activity-chart').getContext('2d');
+        activityChart = new Chart(actCtx, {
+            type: 'line',
+            data: {
+                labels: ['6h ago', '5h ago', '4h ago', '3h ago', '2h ago', '1h ago', 'Now'],
+                datasets: [{
+                    label: 'Signals',
+                    data: [12, 19, 15, 25, 22, 30, 28],
+                    borderColor: 'rgba(0, 210, 106, 1)',
+                    backgroundColor: 'rgba(0, 210, 106, 0.1)',
+                    fill: true,
+                    tension: 0.4,
+                    pointRadius: 4,
+                    pointBackgroundColor: 'rgba(0, 210, 106, 1)'
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: false
+                    }
+                },
+                scales: {
+                    x: {
+                        grid: {
+                            color: 'rgba(42, 42, 58, 0.5)'
+                        },
+                        ticks: {
+                            color: '#6b6b7b'
+                        }
+                    },
+                    y: {
+                        grid: {
+                            color: 'rgba(42, 42, 58, 0.5)'
+                        },
+                        ticks: {
+                            color: '#6b6b7b'
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    // Load dashboard data
+    async function loadDashboard() {
+        const data = await fetchData('/api/dashboard');
+        if (data) {
+            document.getElementById('stat-opps').textContent = data.opportunities_count || 0;
+            document.getElementById('stat-signals').textContent = data.signals_count || 0;
+        }
+    }
+
+    // Load opportunities
+    async function loadOpportunities() {
+        const data = await fetchData('/api/opportunities');
+        const table = document.getElementById('top-opps-table');
+
+        if (!data || data.length === 0) {
+            table.innerHTML = `
+                <tr>
+                    <td colspan="4" class="empty-state">
+                        <i class="fas fa-search"></i>
+                        <p>No opportunities found</p>
+                    </td>
+                </tr>
+            `;
+            return;
+        }
+
+        table.innerHTML = data.slice(0, 5).map(opp => `
+            <tr>
+                <td>
+                    <div style="max-width: 200px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                        ${opp.market_name}
+                    </div>
+                </td>
+                <td>
+                    <span class="badge ${opp.score >= 0.7 ? 'badge-green' : opp.score >= 0.4 ? 'badge-blue' : 'badge-yellow'}">
+                        ${opp.score.toFixed(2)}
+                    </span>
+                </td>
+                <td class="${opp.ev >= 0 ? 'sentiment-bullish' : 'sentiment-bearish'}">
+                    ${opp.ev >= 0 ? '+' : ''}${opp.ev}%
+                </td>
+                <td>
+                    <span class="badge ${opp.side === 'YES' ? 'badge-green' : 'badge-red'}">
+                        ${opp.side}
+                    </span>
+                </td>
+            </tr>
+        `).join('');
+    }
+
+    // Load social data
+    async function loadSocial() {
+        const data = await fetchData('/api/social');
+        const container = document.getElementById('social-overview');
+
+        if (!data || !data.summary) {
+            container.innerHTML = `
+                <div class="empty-state">
+                    <i class="fas fa-comments"></i>
+                    <p>No social data available</p>
+                </div>
+            `;
+            return;
+        }
+
+        const summary = data.summary;
+        container.innerHTML = `
+            <div class="sentiment-summary">
+                <div class="sentiment-stat">
+                    <div class="sentiment-value sentiment-bullish">${summary.bullish_count || 0}</div>
+                    <div class="sentiment-label">Bullish</div>
+                </div>
+                <div class="sentiment-stat">
+                    <div class="sentiment-value sentiment-neutral">${summary.neutral_count || 0}</div>
+                    <div class="sentiment-label">Neutral</div>
+                </div>
+                <div class="sentiment-stat">
+                    <div class="sentiment-value sentiment-bearish">${summary.bearish_count || 0}</div>
+                    <div class="sentiment-label">Bearish</div>
+                </div>
+            </div>
+            <div class="trending-topics">
+                <div style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.5rem;">TRENDING</div>
+                ${data.trending && data.trending.length > 0 ? data.trending.slice(0, 4).map(t => `
+                    <div class="trending-topic">
+                        <i class="fas fa-hashtag" style="color: var(--accent-blue);"></i>
+                        <span class="topic-name">${t.topic}</span>
+                        <span class="topic-sentiment ${t.sentiment >= 0 ? 'sentiment-bullish' : 'sentiment-bearish'}">
+                            ${t.sentiment >= 0 ? '+' : ''}${t.sentiment.toFixed(2)}
+                        </span>
+                    </div>
+                `).join('') : '<div style="color: var(--text-muted); font-size: 0.85rem;">No trending topics</div>'}
+            </div>
+        `;
+
+        // Update stats
+        document.getElementById('stat-social').textContent = summary.total_posts || 0;
+    }
+
+    // Load signals
+    async function loadSignals() {
+        const data = await fetchData('/api/signals');
+        const container = document.getElementById('recent-signals');
+
+        if (!data || data.length === 0) {
+            container.innerHTML = `
+                <div class="empty-state">
+                    <i class="fas fa-signal"></i>
+                    <p>No recent signals</p>
+                </div>
+            `;
+            return;
+        }
+
+        container.innerHTML = data.slice(0, 8).map(signal => `
+            <div class="signal-item">
+                <div class="signal-icon ${signal.direction === 'BUY' ? 'buy' : 'sell'}">
+                    <i class="fas fa-arrow-${signal.direction === 'BUY' ? 'up' : 'down'}"></i>
+                </div>
+                <div class="signal-content">
+                    <div class="signal-title">${signal.strategy}</div>
+                    <div class="signal-meta">${signal.market_id}</div>
+                </div>
+                <div class="signal-strength ${signal.strength >= 0.7 ? 'sentiment-bullish' : signal.strength >= 0.4 ? '' : 'sentiment-bearish'}">
+                    ${(signal.strength * 100).toFixed(0)}%
+                </div>
+            </div>
+        `).join('');
+    }
+
+    // Load news
+    async function loadNews() {
+        const data = await fetchData('/api/news');
+        const newsContainer = document.getElementById('breaking-news');
+        const eventsContainer = document.getElementById('upcoming-events');
+
+        // Breaking news
+        if (!data || !data.breaking || data.breaking.length === 0) {
+            newsContainer.innerHTML = `
+                <div class="empty-state">
+                    <i class="fas fa-newspaper"></i>
+                    <p>No breaking news</p>
+                </div>
+            `;
+        } else {
+            newsContainer.innerHTML = data.breaking.slice(0, 5).map(news => `
+                <div class="news-item">
+                    <div class="news-title">${news.title || news}</div>
+                    <div class="news-meta">
+                        <span><i class="fas fa-clock"></i> ${news.time || 'Recent'}</span>
+                        <span><i class="fas fa-tag"></i> ${news.category || 'General'}</span>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // Upcoming events
+        if (!data || !data.events || data.events.length === 0) {
+            eventsContainer.innerHTML = `
+                <div class="empty-state">
+                    <i class="fas fa-calendar"></i>
+                    <p>No upcoming events</p>
+                </div>
+            `;
+        } else {
+            eventsContainer.innerHTML = data.events.slice(0, 5).map(event => {
+                const date = event.date ? new Date(event.date) : new Date();
+                return `
+                    <div class="event-item">
+                        <div class="event-date">
+                            <div class="event-day">${date.getDate()}</div>
+                            <div class="event-month">${date.toLocaleString('en', {month: 'short'})}</div>
+                        </div>
+                        <div class="event-content">
+                            <div class="event-title">${event.title || event}</div>
+                            <div class="event-category">${event.category || 'Event'}</div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+    }
+
+    // Refresh all data
+    async function refreshAll() {
+        document.getElementById('status-text').textContent = 'Refreshing...';
+
+        await fetch('/api/refresh', { method: 'POST' });
+
+        await Promise.all([
+            loadDashboard(),
+            loadOpportunities(),
+            loadSocial(),
+            loadSignals(),
+            loadNews()
+        ]);
+
+        document.getElementById('status-text').textContent = 'Live';
+    }
+
+    // Initialize
+    document.addEventListener('DOMContentLoaded', () => {
+        initCharts();
+        loadDashboard();
+        loadOpportunities();
+        loadSocial();
+        loadSignals();
+        loadNews();
+
+        // Update markets stat
+        document.getElementById('stat-markets').textContent = '500+';
+
+        // Auto-refresh every minute
+        setInterval(refreshAll, 60000);
+    });
+</script>
+{% endblock %}

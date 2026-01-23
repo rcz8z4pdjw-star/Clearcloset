@@ -1,0 +1,590 @@
+{% extends "base.html" %}
+
+{% block title %}News & Events - PredictFlow{% endblock %}
+
+{% block content %}
+<!-- Top Bar -->
+<div class="topbar">
+    <h1 class="page-title">News & Events</h1>
+    <div class="topbar-actions">
+        <div class="status-indicator">
+            <span class="status-dot"></span>
+            <span>Live Feed</span>
+        </div>
+        <button class="btn btn-secondary" onclick="refreshNews()">
+            <i class="fas fa-sync-alt"></i>
+            Refresh
+        </button>
+    </div>
+</div>
+
+<!-- Page Content -->
+<div class="page-content">
+    <!-- Category Stats -->
+    <div class="grid grid-cols-4" style="margin-bottom: 1.5rem;">
+        <div class="stat-card category-card" data-category="politics">
+            <div class="stat-icon" style="background: var(--accent-blue-dim); color: var(--accent-blue);">
+                <i class="fas fa-landmark"></i>
+            </div>
+            <div class="stat-label">Politics</div>
+            <div class="stat-value" id="cat-politics">-</div>
+        </div>
+        <div class="stat-card category-card" data-category="economics">
+            <div class="stat-icon" style="background: var(--accent-green-dim); color: var(--accent-green);">
+                <i class="fas fa-chart-line"></i>
+            </div>
+            <div class="stat-label">Economics</div>
+            <div class="stat-value" id="cat-economics">-</div>
+        </div>
+        <div class="stat-card category-card" data-category="crypto">
+            <div class="stat-icon" style="background: var(--accent-yellow-dim); color: var(--accent-yellow);">
+                <i class="fab fa-bitcoin"></i>
+            </div>
+            <div class="stat-label">Crypto</div>
+            <div class="stat-value" id="cat-crypto">-</div>
+        </div>
+        <div class="stat-card category-card" data-category="sports">
+            <div class="stat-icon" style="background: var(--accent-purple); background: rgba(139, 92, 246, 0.15); color: var(--accent-purple);">
+                <i class="fas fa-football-ball"></i>
+            </div>
+            <div class="stat-label">Sports</div>
+            <div class="stat-value" id="cat-sports">-</div>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="grid" style="grid-template-columns: 2fr 1fr; margin-bottom: 1.5rem;">
+        <!-- Breaking News -->
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">
+                    <i class="fas fa-bolt" style="color: var(--accent-yellow);"></i>
+                    Breaking News
+                </h3>
+                <div class="filter-tabs">
+                    <button class="filter-tab active" data-filter="all">All</button>
+                    <button class="filter-tab" data-filter="politics">Politics</button>
+                    <button class="filter-tab" data-filter="economics">Economics</button>
+                    <button class="filter-tab" data-filter="crypto">Crypto</button>
+                </div>
+            </div>
+            <div class="card-body" style="padding: 0;">
+                <div id="news-feed" style="max-height: 600px; overflow-y: auto;">
+                    <div class="loading">
+                        <div class="spinner"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sidebar -->
+        <div>
+            <!-- Upcoming Events -->
+            <div class="card" style="margin-bottom: 1.5rem;">
+                <div class="card-header">
+                    <h3 class="card-title">
+                        <i class="fas fa-calendar-alt" style="color: var(--accent-blue);"></i>
+                        Upcoming Events
+                    </h3>
+                </div>
+                <div class="card-body" style="padding: 0;">
+                    <div id="events-list" style="max-height: 350px; overflow-y: auto;">
+                        <div class="loading">
+                            <div class="spinner"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Market Impact Alerts -->
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">
+                        <i class="fas fa-exclamation-triangle" style="color: var(--accent-red);"></i>
+                        Impact Alerts
+                    </h3>
+                </div>
+                <div class="card-body" style="padding: 0;">
+                    <div id="alerts-list">
+                        <div class="alert-item high">
+                            <div class="alert-icon">
+                                <i class="fas fa-arrow-up"></i>
+                            </div>
+                            <div class="alert-content">
+                                <div class="alert-title">High Volume Detected</div>
+                                <div class="alert-meta">Election Markets - 2 min ago</div>
+                            </div>
+                        </div>
+                        <div class="alert-item medium">
+                            <div class="alert-icon">
+                                <i class="fas fa-chart-line"></i>
+                            </div>
+                            <div class="alert-content">
+                                <div class="alert-title">Price Movement Alert</div>
+                                <div class="alert-meta">Crypto Markets - 15 min ago</div>
+                            </div>
+                        </div>
+                        <div class="alert-item low">
+                            <div class="alert-icon">
+                                <i class="fas fa-newspaper"></i>
+                            </div>
+                            <div class="alert-content">
+                                <div class="alert-title">News Spike</div>
+                                <div class="alert-meta">Economic Data - 30 min ago</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- RSS Sources -->
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title">
+                <i class="fas fa-rss" style="color: var(--accent-yellow);"></i>
+                News Sources
+            </h3>
+            <span style="font-size: 0.85rem; color: var(--text-muted);">Real-time RSS Monitoring</span>
+        </div>
+        <div class="card-body">
+            <div class="sources-grid">
+                <div class="source-card active">
+                    <div class="source-icon"><i class="fas fa-globe"></i></div>
+                    <div class="source-name">Associated Press</div>
+                    <div class="source-status">
+                        <span class="status-dot"></span> Live
+                    </div>
+                </div>
+                <div class="source-card active">
+                    <div class="source-icon"><i class="fas fa-newspaper"></i></div>
+                    <div class="source-name">Reuters</div>
+                    <div class="source-status">
+                        <span class="status-dot"></span> Live
+                    </div>
+                </div>
+                <div class="source-card active">
+                    <div class="source-icon"><i class="fas fa-chart-bar"></i></div>
+                    <div class="source-name">Bloomberg</div>
+                    <div class="source-status">
+                        <span class="status-dot"></span> Live
+                    </div>
+                </div>
+                <div class="source-card active">
+                    <div class="source-icon"><i class="fab fa-bitcoin"></i></div>
+                    <div class="source-name">CoinDesk</div>
+                    <div class="source-status">
+                        <span class="status-dot"></span> Live
+                    </div>
+                </div>
+                <div class="source-card active">
+                    <div class="source-icon"><i class="fas fa-football-ball"></i></div>
+                    <div class="source-name">ESPN</div>
+                    <div class="source-status">
+                        <span class="status-dot"></span> Live
+                    </div>
+                </div>
+                <div class="source-card active">
+                    <div class="source-icon"><i class="fas fa-landmark"></i></div>
+                    <div class="source-name">Politico</div>
+                    <div class="source-status">
+                        <span class="status-dot"></span> Live
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    .stat-card {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+    }
+
+    .stat-icon {
+        width: 48px;
+        height: 48px;
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.25rem;
+    }
+
+    .category-card {
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .category-card:hover {
+        transform: translateY(-2px);
+        box-shadow: var(--shadow-md);
+    }
+
+    .filter-tabs {
+        display: flex;
+        gap: 0.5rem;
+    }
+
+    .filter-tab {
+        padding: 0.35rem 0.75rem;
+        background: transparent;
+        border: 1px solid var(--border-color);
+        border-radius: 6px;
+        color: var(--text-secondary);
+        font-size: 0.75rem;
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+
+    .filter-tab:hover {
+        border-color: var(--accent-blue);
+        color: var(--accent-blue);
+    }
+
+    .filter-tab.active {
+        background: var(--accent-blue);
+        border-color: var(--accent-blue);
+        color: white;
+    }
+
+    .news-item {
+        padding: 1rem 1.25rem;
+        border-bottom: 1px solid var(--border-color);
+        transition: background 0.2s;
+    }
+
+    .news-item:hover {
+        background: var(--bg-hover);
+    }
+
+    .news-header {
+        display: flex;
+        align-items: flex-start;
+        gap: 0.75rem;
+        margin-bottom: 0.5rem;
+    }
+
+    .news-impact {
+        flex-shrink: 0;
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        margin-top: 6px;
+    }
+
+    .news-impact.high { background: var(--accent-red); }
+    .news-impact.medium { background: var(--accent-yellow); }
+    .news-impact.low { background: var(--accent-green); }
+
+    .news-title {
+        font-weight: 500;
+        line-height: 1.4;
+        flex: 1;
+    }
+
+    .news-meta {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        margin-top: 0.5rem;
+        font-size: 0.75rem;
+        color: var(--text-muted);
+    }
+
+    .news-category {
+        padding: 0.15rem 0.5rem;
+        background: var(--bg-hover);
+        border-radius: 4px;
+        text-transform: uppercase;
+        font-size: 0.65rem;
+        letter-spacing: 0.5px;
+    }
+
+    .event-item {
+        display: flex;
+        align-items: flex-start;
+        gap: 0.75rem;
+        padding: 0.875rem 1rem;
+        border-bottom: 1px solid var(--border-color);
+    }
+
+    .event-item:hover {
+        background: var(--bg-hover);
+    }
+
+    .event-date-box {
+        text-align: center;
+        background: var(--bg-hover);
+        padding: 0.5rem 0.75rem;
+        border-radius: 8px;
+        min-width: 52px;
+    }
+
+    .event-day {
+        font-size: 1.25rem;
+        font-weight: 700;
+        font-family: 'JetBrains Mono', monospace;
+        line-height: 1;
+    }
+
+    .event-month {
+        font-size: 0.65rem;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        margin-top: 0.15rem;
+    }
+
+    .event-content {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .event-title {
+        font-weight: 500;
+        font-size: 0.9rem;
+        margin-bottom: 0.25rem;
+    }
+
+    .event-category {
+        font-size: 0.7rem;
+        color: var(--text-muted);
+    }
+
+    .alert-item {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        padding: 0.75rem 1rem;
+        border-bottom: 1px solid var(--border-color);
+    }
+
+    .alert-icon {
+        width: 32px;
+        height: 32px;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.8rem;
+    }
+
+    .alert-item.high .alert-icon {
+        background: var(--accent-red-dim);
+        color: var(--accent-red);
+    }
+
+    .alert-item.medium .alert-icon {
+        background: var(--accent-yellow-dim);
+        color: var(--accent-yellow);
+    }
+
+    .alert-item.low .alert-icon {
+        background: var(--accent-blue-dim);
+        color: var(--accent-blue);
+    }
+
+    .alert-content {
+        flex: 1;
+    }
+
+    .alert-title {
+        font-weight: 500;
+        font-size: 0.85rem;
+    }
+
+    .alert-meta {
+        font-size: 0.7rem;
+        color: var(--text-muted);
+    }
+
+    .sources-grid {
+        display: grid;
+        grid-template-columns: repeat(6, 1fr);
+        gap: 1rem;
+    }
+
+    .source-card {
+        text-align: center;
+        padding: 1rem;
+        background: var(--bg-hover);
+        border-radius: 8px;
+        border: 1px solid var(--border-color);
+    }
+
+    .source-card.active {
+        border-color: var(--accent-green);
+    }
+
+    .source-icon {
+        font-size: 1.5rem;
+        margin-bottom: 0.5rem;
+        color: var(--text-secondary);
+    }
+
+    .source-name {
+        font-size: 0.8rem;
+        font-weight: 500;
+        margin-bottom: 0.5rem;
+    }
+
+    .source-status {
+        font-size: 0.7rem;
+        color: var(--accent-green);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.25rem;
+    }
+
+    @media (max-width: 1200px) {
+        .sources-grid {
+            grid-template-columns: repeat(3, 1fr);
+        }
+    }
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    let currentFilter = 'all';
+
+    // Load news data
+    async function loadNewsData() {
+        const data = await fetchData('/api/news');
+
+        if (!data) {
+            console.log('No news data available');
+            return;
+        }
+
+        // Update category counts
+        const counts = data.category_counts || {};
+        document.getElementById('cat-politics').textContent = counts.POLITICS || 0;
+        document.getElementById('cat-economics').textContent = counts.ECONOMICS || 0;
+        document.getElementById('cat-crypto').textContent = counts.CRYPTO || 0;
+        document.getElementById('cat-sports').textContent = counts.SPORTS || 0;
+
+        // Render news
+        renderNews(data.breaking || []);
+
+        // Render events
+        renderEvents(data.events || []);
+    }
+
+    // Render news feed
+    function renderNews(news) {
+        const container = document.getElementById('news-feed');
+
+        if (!news || news.length === 0) {
+            container.innerHTML = `
+                <div class="empty-state">
+                    <i class="fas fa-newspaper"></i>
+                    <p>No news available</p>
+                </div>
+            `;
+            return;
+        }
+
+        // Filter if needed
+        let filtered = news;
+        if (currentFilter !== 'all') {
+            filtered = news.filter(n =>
+                (n.category || '').toLowerCase() === currentFilter.toLowerCase()
+            );
+        }
+
+        if (filtered.length === 0) {
+            container.innerHTML = `
+                <div class="empty-state">
+                    <i class="fas fa-filter"></i>
+                    <p>No news in this category</p>
+                </div>
+            `;
+            return;
+        }
+
+        container.innerHTML = filtered.map(item => {
+            const impactClass = item.impact === 'high' ? 'high' : item.impact === 'medium' ? 'medium' : 'low';
+
+            return `
+                <div class="news-item">
+                    <div class="news-header">
+                        <div class="news-impact ${impactClass}"></div>
+                        <div class="news-title">${item.title || item}</div>
+                    </div>
+                    <div class="news-meta">
+                        ${item.category ? `<span class="news-category">${item.category}</span>` : ''}
+                        <span><i class="fas fa-clock"></i> ${item.time || 'Recent'}</span>
+                        ${item.source ? `<span><i class="fas fa-link"></i> ${item.source}</span>` : ''}
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
+
+    // Render events
+    function renderEvents(events) {
+        const container = document.getElementById('events-list');
+
+        if (!events || events.length === 0) {
+            container.innerHTML = `
+                <div class="empty-state">
+                    <i class="fas fa-calendar"></i>
+                    <p>No upcoming events</p>
+                </div>
+            `;
+            return;
+        }
+
+        container.innerHTML = events.slice(0, 8).map(event => {
+            const date = event.date ? new Date(event.date) : new Date();
+
+            return `
+                <div class="event-item">
+                    <div class="event-date-box">
+                        <div class="event-day">${date.getDate()}</div>
+                        <div class="event-month">${date.toLocaleString('en', {month: 'short'})}</div>
+                    </div>
+                    <div class="event-content">
+                        <div class="event-title">${event.title || event}</div>
+                        <div class="event-category">${event.category || 'Event'}</div>
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
+
+    // Filter tabs
+    document.querySelectorAll('.filter-tab').forEach(tab => {
+        tab.addEventListener('click', () => {
+            document.querySelectorAll('.filter-tab').forEach(t => t.classList.remove('active'));
+            tab.classList.add('active');
+            currentFilter = tab.dataset.filter;
+            loadNewsData();
+        });
+    });
+
+    // Refresh
+    async function refreshNews() {
+        document.getElementById('news-feed').innerHTML = `
+            <div class="loading">
+                <div class="spinner"></div>
+            </div>
+        `;
+
+        await fetch('/api/refresh', { method: 'POST' });
+        await loadNewsData();
+    }
+
+    // Initialize
+    document.addEventListener('DOMContentLoaded', () => {
+        loadNewsData();
+    });
+</script>
+{% endblock %}

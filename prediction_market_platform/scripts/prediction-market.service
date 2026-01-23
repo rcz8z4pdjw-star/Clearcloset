@@ -1,0 +1,77 @@
+# =============================================================================
+# Systemd Service File for Prediction Market Research Platform
+# =============================================================================
+#
+# Installation:
+#   1. Copy this file to /etc/systemd/system/prediction-market.service
+#   2. Update paths and user settings below
+#   3. Run: sudo systemctl daemon-reload
+#   4. Run: sudo systemctl enable prediction-market
+#   5. Run: sudo systemctl start prediction-market
+#
+# Commands:
+#   sudo systemctl status prediction-market   # Check status
+#   sudo systemctl restart prediction-market  # Restart service
+#   sudo journalctl -u prediction-market -f   # View logs
+#
+# =============================================================================
+
+[Unit]
+Description=Prediction Market Research Platform
+After=network.target
+Wants=network-online.target
+
+[Service]
+Type=exec
+User=www-data
+Group=www-data
+WorkingDirectory=/opt/prediction-market
+
+# Environment variables
+Environment="FLASK_ENV=production"
+Environment="PM_HOST=0.0.0.0"
+Environment="PM_PORT=5000"
+Environment="PM_WORKERS=4"
+
+# Load secrets from environment file (recommended)
+EnvironmentFile=-/opt/prediction-market/.env
+
+# Start command
+ExecStart=/opt/prediction-market/venv/bin/gunicorn \
+    --bind 0.0.0.0:5000 \
+    --workers 4 \
+    --threads 2 \
+    --timeout 120 \
+    --keep-alive 5 \
+    --max-requests 1000 \
+    --max-requests-jitter 100 \
+    --access-logfile /var/log/prediction-market/access.log \
+    --error-logfile /var/log/prediction-market/error.log \
+    --capture-output \
+    --enable-stdio-inheritance \
+    --graceful-timeout 30 \
+    web.app:app
+
+# Restart behavior
+Restart=always
+RestartSec=5
+
+# Security hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/opt/prediction-market/data
+ReadWritePaths=/var/log/prediction-market
+
+# Resource limits
+MemoryMax=2G
+TasksMax=100
+
+# Graceful shutdown
+TimeoutStopSec=30
+KillMode=mixed
+KillSignal=SIGTERM
+
+[Install]
+WantedBy=multi-user.target
