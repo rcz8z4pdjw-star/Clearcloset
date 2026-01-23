@@ -122,8 +122,17 @@ model User {
   lastActivityAt     DateTime @default(now())
   emailVerified      Boolean  @default(false)
   isActive           Boolean  @default(true)
+  status             String   @default("ACTIVE")
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
+
+  // Gamification
+  xp                 Int      @default(0)
+  level              Int      @default(1)
+  streak             Int      @default(0)
+  longestStreak      Int      @default(0)
+  lastActivityDate   DateTime?
+  avatar             Json?    // Custom avatar configuration
 
   // Relations
   roles              UserRole[]
@@ -189,6 +198,12 @@ model User {
   // Audit
   auditLogs          AuditLog[]
   exportJobs         ExportJob[]
+
+  // Gamification
+  xpTransactions     XpTransaction[]
+  dailyChallenges    DailyChallengeCompletion[]
+  familyConnections  FamilyConnection[]
+  activityLogs       ActivityLog[]
 }
 
 model UserRole {
@@ -1242,6 +1257,148 @@ model ICMeeting {
   minutes         String?
   attendees       String[]
   status          String        @default("scheduled") // "scheduled", "in_progress", "completed"
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+}
+
+// ====================
+// GAMIFICATION
+// ====================
+
+model XpTransaction {
+  id              String        @id @default(cuid())
+  userId          String
+  amount          Int
+  reason          String
+  source          String        // "lesson", "quiz", "badge", "challenge", "streak", "system"
+  balanceAfter    Int
+  metadata        Json?
+  createdAt       DateTime      @default(now())
+
+  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([createdAt])
+}
+
+model DailyChallengeCompletion {
+  id              String        @id @default(cuid())
+  userId          String
+  challengeId     String
+  xpEarned        Int           @default(0)
+  completedAt     DateTime      @default(now())
+
+  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, challengeId, completedAt])
+  @@index([userId])
+  @@index([completedAt])
+}
+
+model FamilyConnection {
+  id              String        @id @default(cuid())
+  userId          String
+  connectedUserId String
+  relationship    String        // "parent", "child", "sibling", "mentor"
+  status          String        @default("ACTIVE")
+  createdAt       DateTime      @default(now())
+
+  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, connectedUserId])
+}
+
+model ActivityLog {
+  id              String        @id @default(cuid())
+  userId          String
+  action          String        // "completed_lesson", "earned_badge", "passed_quiz", etc.
+  entityType      String
+  entityId        String?
+  metadata        Json?
+  xpEarned        Int           @default(0)
+  isPublic        Boolean       @default(true)
+  createdAt       DateTime      @default(now())
+
+  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([createdAt])
+}
+
+model FamilyChallenge {
+  id              String        @id @default(cuid())
+  householdId     String
+  title           String
+  description     String
+  startDate       DateTime
+  endDate         DateTime
+  targetProgress  Int
+  currentProgress Int           @default(0)
+  xpReward        Int
+  isActive        Boolean       @default(true)
+  completedAt     DateTime?
+  createdAt       DateTime      @default(now())
+
+  participants    FamilyChallengeParticipant[]
+}
+
+model FamilyChallengeParticipant {
+  id              String        @id @default(cuid())
+  challengeId     String
+  userId          String
+  progress        Int           @default(0)
+  joinedAt        DateTime      @default(now())
+
+  challenge       FamilyChallenge @relation(fields: [challengeId], references: [id], onDelete: Cascade)
+
+  @@unique([challengeId, userId])
+}
+
+model UserGoal {
+  id              String        @id @default(cuid())
+  userId          String
+  type            String        // "lessons_per_week", "quiz_score", "streak_days"
+  target          Int
+  current         Int           @default(0)
+  period          String        // "weekly", "monthly", "custom"
+  startDate       DateTime      @default(now())
+  endDate         DateTime?
+  isActive        Boolean       @default(true)
+  completedAt     DateTime?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@index([userId])
+}
+
+model OnboardingProgress {
+  id              String        @id @default(cuid())
+  userId          String        @unique
+  completedSteps  String[]
+  nickname        String?
+  interests       String[]
+  goals           String[]
+  isComplete      Boolean       @default(false)
+  completedAt     DateTime?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+}
+
+model Resource {
+  id              String        @id @default(cuid())
+  slug            String        @unique
+  title           String
+  description     String?
+  type            String        // "video", "article", "guide", "template", "tool"
+  url             String?
+  content         String?
+  thumbnailUrl    String?
+  minAgeBand      AgeBandType?
+  maxAgeBand      AgeBandType?
+  category        String?
+  tags            String[]
+  isPublished     Boolean       @default(false)
+  viewCount       Int           @default(0)
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
 }
