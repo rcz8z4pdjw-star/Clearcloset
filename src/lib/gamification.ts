@@ -245,3 +245,210 @@ export const DAILY_CHALLENGES = {
 export function getDailyChallenges(ageBand: string) {
   return DAILY_CHALLENGES[ageBand as keyof typeof DAILY_CHALLENGES] || DAILY_CHALLENGES.TEEN_SKILLS;
 }
+
+// Achievement definitions
+export const ACHIEVEMENTS = {
+  LEARNING: [
+    { id: 'first_lesson', name: 'First Steps', description: 'Complete your first lesson', icon: 'BookOpen', xp: 25, threshold: 1 },
+    { id: 'ten_lessons', name: 'Knowledge Seeker', description: 'Complete 10 lessons', icon: 'BookOpen', xp: 100, threshold: 10 },
+    { id: 'fifty_lessons', name: 'Scholar', description: 'Complete 50 lessons', icon: 'GraduationCap', xp: 250, threshold: 50 },
+    { id: 'hundred_lessons', name: 'Academic', description: 'Complete 100 lessons', icon: 'Award', xp: 500, threshold: 100 },
+  ],
+  QUIZ: [
+    { id: 'first_quiz', name: 'Quiz Taker', description: 'Pass your first quiz', icon: 'CheckCircle', xp: 25, threshold: 1 },
+    { id: 'perfect_quiz', name: 'Perfectionist', description: 'Get 100% on a quiz', icon: 'Star', xp: 50, threshold: 1 },
+    { id: 'ten_quizzes', name: 'Quiz Master', description: 'Pass 10 quizzes', icon: 'CheckCircle', xp: 100, threshold: 10 },
+    { id: 'quiz_streak', name: 'On Fire', description: 'Pass 5 quizzes in a row', icon: 'Flame', xp: 150, threshold: 5 },
+  ],
+  STREAK: [
+    { id: 'week_streak', name: 'Consistent', description: 'Maintain a 7-day streak', icon: 'Flame', xp: 50, threshold: 7 },
+    { id: 'month_streak', name: 'Dedicated', description: 'Maintain a 30-day streak', icon: 'Flame', xp: 150, threshold: 30 },
+    { id: 'quarter_streak', name: 'Committed', description: 'Maintain a 90-day streak', icon: 'Trophy', xp: 400, threshold: 90 },
+    { id: 'year_streak', name: 'Legendary', description: 'Maintain a 365-day streak', icon: 'Crown', xp: 1000, threshold: 365 },
+  ],
+  SOCIAL: [
+    { id: 'first_connection', name: 'Networker', description: 'Make your first connection', icon: 'Users', xp: 15, threshold: 1 },
+    { id: 'ten_connections', name: 'Social Butterfly', description: 'Connect with 10 people', icon: 'Users', xp: 75, threshold: 10 },
+    { id: 'group_founder', name: 'Community Builder', description: 'Create a study group', icon: 'Users', xp: 50, threshold: 1 },
+    { id: 'first_referral', name: 'Ambassador', description: 'Successfully refer someone', icon: 'Share2', xp: 100, threshold: 1 },
+  ],
+  TRACK: [
+    { id: 'first_track', name: 'Track Champion', description: 'Complete your first track', icon: 'Flag', xp: 200, threshold: 1 },
+    { id: 'three_tracks', name: 'Multi-Tracker', description: 'Complete 3 tracks', icon: 'Flag', xp: 500, threshold: 3 },
+    { id: 'all_tracks', name: 'Completionist', description: 'Complete all tracks', icon: 'Trophy', xp: 1000, threshold: -1 },
+  ],
+  PORTFOLIO: [
+    { id: 'first_portfolio', name: 'Investor', description: 'Create your first portfolio', icon: 'Briefcase', xp: 50, threshold: 1 },
+    { id: 'first_profit', name: 'Money Maker', description: 'Make your first profit', icon: 'TrendingUp', xp: 75, threshold: 1 },
+    { id: 'ten_trades', name: 'Active Trader', description: 'Execute 10 trades', icon: 'BarChart2', xp: 100, threshold: 10 },
+  ],
+};
+
+// Badge rarity system
+export type BadgeRarity = 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary';
+
+export const BADGE_RARITY_CONFIG: Record<BadgeRarity, { color: string; bgColor: string; borderColor: string; label: string }> = {
+  common: { color: 'text-gray-600', bgColor: 'bg-gray-100', borderColor: 'border-gray-300', label: 'Common' },
+  uncommon: { color: 'text-green-600', bgColor: 'bg-green-100', borderColor: 'border-green-300', label: 'Uncommon' },
+  rare: { color: 'text-blue-600', bgColor: 'bg-blue-100', borderColor: 'border-blue-300', label: 'Rare' },
+  epic: { color: 'text-purple-600', bgColor: 'bg-purple-100', borderColor: 'border-purple-300', label: 'Epic' },
+  legendary: { color: 'text-yellow-600', bgColor: 'bg-yellow-50', borderColor: 'border-yellow-400', label: 'Legendary' },
+};
+
+// Leaderboard types
+export type LeaderboardPeriod = 'daily' | 'weekly' | 'monthly' | 'allTime';
+export type LeaderboardType = 'xp' | 'streak' | 'lessons' | 'quizzes';
+
+// Format XP with abbreviation
+export function formatXP(xp: number): string {
+  if (xp >= 1000000) return `${(xp / 1000000).toFixed(1)}M`;
+  if (xp >= 1000) return `${(xp / 1000).toFixed(1)}K`;
+  return xp.toString();
+}
+
+// Calculate learning time in minutes
+export function calculateLearningTime(lessonCount: number, quizCount: number, flashcardSessions: number = 0): number {
+  // Estimates: lessons ~10 min, quizzes ~5 min, flashcards ~8 min
+  return lessonCount * 10 + quizCount * 5 + flashcardSessions * 8;
+}
+
+// Format learning time
+export function formatLearningTime(minutes: number): string {
+  if (minutes < 60) return `${minutes}m`;
+  const hours = Math.floor(minutes / 60);
+  const mins = minutes % 60;
+  if (hours < 24) return mins > 0 ? `${hours}h ${mins}m` : `${hours}h`;
+  const days = Math.floor(hours / 24);
+  const remainingHours = hours % 24;
+  return remainingHours > 0 ? `${days}d ${remainingHours}h` : `${days}d`;
+}
+
+// Referral tier system
+export const REFERRAL_TIERS = [
+  { name: 'Bronze', minReferrals: 0, maxReferrals: 2, bonusXP: 50, color: 'text-orange-600', bgColor: 'bg-orange-100' },
+  { name: 'Silver', minReferrals: 3, maxReferrals: 5, bonusXP: 75, color: 'text-gray-500', bgColor: 'bg-gray-100' },
+  { name: 'Gold', minReferrals: 6, maxReferrals: 10, bonusXP: 100, color: 'text-yellow-600', bgColor: 'bg-yellow-100' },
+  { name: 'Platinum', minReferrals: 11, maxReferrals: Infinity, bonusXP: 150, color: 'text-purple-600', bgColor: 'bg-purple-100' },
+];
+
+export function getReferralTier(referralCount: number) {
+  return REFERRAL_TIERS.find(tier => referralCount >= tier.minReferrals && referralCount <= tier.maxReferrals) || REFERRAL_TIERS[0];
+}
+
+// Check if user qualifies for achievement
+export async function checkAchievement(
+  userId: string,
+  achievementId: string,
+  currentValue: number
+) {
+  const allAchievements = [
+    ...ACHIEVEMENTS.LEARNING,
+    ...ACHIEVEMENTS.QUIZ,
+    ...ACHIEVEMENTS.STREAK,
+    ...ACHIEVEMENTS.SOCIAL,
+    ...ACHIEVEMENTS.TRACK,
+    ...ACHIEVEMENTS.PORTFOLIO,
+  ];
+
+  const achievement = allAchievements.find(a => a.id === achievementId);
+  if (!achievement) return null;
+
+  // Check if user already has this badge
+  const existingBadge = await prisma.userBadge.findFirst({
+    where: {
+      userId,
+      badge: { name: achievement.name },
+    },
+  });
+
+  if (existingBadge) return null;
+
+  // Check if threshold met
+  if (currentValue >= achievement.threshold) {
+    // Find or create the badge
+    let badge = await prisma.badge.findFirst({
+      where: { name: achievement.name },
+    });
+
+    if (!badge) {
+      badge = await prisma.badge.create({
+        data: {
+          name: achievement.name,
+          description: achievement.description,
+          imageUrl: `/badges/${achievement.id}.png`,
+          category: 'achievement',
+        },
+      });
+    }
+
+    // Award badge to user
+    await prisma.userBadge.create({
+      data: {
+        userId,
+        badgeId: badge.id,
+      },
+    });
+
+    // Award XP for earning badge
+    await awardXP(userId, achievement.xp, `Earned badge: ${achievement.name}`, 'badge', badge.id);
+
+    // Create notification
+    await prisma.notification.create({
+      data: {
+        userId,
+        type: 'BADGE_EARNED',
+        title: `New Badge: ${achievement.name}!`,
+        message: achievement.description,
+        link: '/dashboard/badges',
+      },
+    });
+
+    return { badge, achievement };
+  }
+
+  return null;
+}
+
+// Calculate user rank position
+export async function getUserRank(userId: string, type: LeaderboardType = 'xp'): Promise<number> {
+  const users = await prisma.user.findMany({
+    select: {
+      id: true,
+      totalXP: true,
+      currentStreak: true,
+      _count: {
+        select: {
+          lessonProgress: { where: { completedAt: { not: null } } },
+          quizAttempts: { where: { passed: true } },
+        },
+      },
+    },
+    orderBy: type === 'xp' ? { totalXP: 'desc' } : type === 'streak' ? { currentStreak: 'desc' } : undefined,
+  });
+
+  if (type === 'lessons') {
+    users.sort((a, b) => b._count.lessonProgress - a._count.lessonProgress);
+  } else if (type === 'quizzes') {
+    users.sort((a, b) => b._count.quizAttempts - a._count.quizAttempts);
+  }
+
+  const rank = users.findIndex(u => u.id === userId) + 1;
+  return rank || users.length + 1;
+}
+
+// Progress milestones for visual indicators
+export const PROGRESS_MILESTONES = [
+  { percent: 25, label: 'Getting Started', color: 'bg-blue-500' },
+  { percent: 50, label: 'Halfway There', color: 'bg-yellow-500' },
+  { percent: 75, label: 'Almost Done', color: 'bg-orange-500' },
+  { percent: 100, label: 'Complete!', color: 'bg-green-500' },
+];
+
+export function getMilestone(percent: number) {
+  for (let i = PROGRESS_MILESTONES.length - 1; i >= 0; i--) {
+    if (percent >= PROGRESS_MILESTONES[i].percent) {
+      return PROGRESS_MILESTONES[i];
+    }
+  }
+  return { percent: 0, label: 'Just Started', color: 'bg-gray-400' };
+}

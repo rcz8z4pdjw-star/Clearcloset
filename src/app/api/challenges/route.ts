@@ -131,15 +131,112 @@ export async function POST(request: NextRequest) {
       });
     }
 
+    // Check if all daily challenges completed
+    const allCompletedToday = await prisma.dailyChallengeCompletion.count({
+      where: {
+        userId: user.id,
+        completedAt: { gte: today },
+      },
+    });
+
+    // Bonus for completing all challenges (assuming 3 challenges per day)
+    let bonusXp = 0;
+    if (allCompletedToday === 3) {
+      bonusXp = 50;
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { xp: { increment: bonusXp } },
+      });
+
+      await prisma.notification.create({
+        data: {
+          userId: user.id,
+          type: 'ACHIEVEMENT',
+          title: 'Daily Champion!',
+          message: 'You completed all daily challenges! +50 bonus XP',
+          link: '/dashboard/challenges',
+        },
+      });
+    }
+
     return NextResponse.json({
       success: true,
       message: 'Challenge completed!',
       xpAwarded: xpReward || 0,
+      bonusXp,
+      allChallengesComplete: allCompletedToday === 3,
     });
   } catch (error) {
     console.error('Complete challenge error:', error);
     return NextResponse.json(
       { error: 'Failed to complete challenge' },
+      { status: 500 }
+    );
+  }
+}
+
+// Get challenge history
+export async function PUT(request: NextRequest) {
+  try {
+    const user = await getCurrentUser();
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const body = await request.json();
+    const { days = 7 } = body;
+
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - days);
+    startDate.setHours(0, 0, 0, 0);
+
+    // Get challenge completions for the period
+    const completions = await prisma.dailyChallengeCompletion.findMany({
+      where: {
+        userId: user.id,
+        completedAt: { gte: startDate },
+      },
+      orderBy: { completedAt: 'desc' },
+    });
+
+    // Group by day
+    const history: Record<string, { date: string; challenges: number; xp: number }> = {};
+
+    for (let i = 0; i < days; i++) {
+      const date = new Date(startDate);
+      date.setDate(date.getDate() + i);
+      const dateStr = date.toISOString().split('T')[0];
+
+      const dayCompletions = completions.filter(c => {
+        const compDate = new Date(c.completedAt);
+        return compDate.toISOString().split('T')[0] === dateStr;
+      });
+
+      history[dateStr] = {
+        date: dateStr,
+        challenges: dayCompletions.length,
+        xp: dayCompletions.reduce((sum, c) => sum + c.xpEarned, 0),
+      };
+    }
+
+    // Calculate stats
+    const totalChallenges = completions.length;
+    const totalXp = completions.reduce((sum, c) => sum + c.xpEarned, 0);
+    const perfectDays = Object.values(history).filter(h => h.challenges >= 3).length;
+
+    return NextResponse.json({
+      history: Object.values(history).reverse(),
+      stats: {
+        totalChallenges,
+        totalXp,
+        perfectDays,
+        averageChallengesPerDay: days > 0 ? (totalChallenges / days).toFixed(1) : '0',
+      },
+    });
+  } catch (error) {
+    console.error('Get challenge history error:', error);
+    return NextResponse.json(
+      { error: 'Failed to fetch challenge history' },
       { status: 500 }
     );
   }
