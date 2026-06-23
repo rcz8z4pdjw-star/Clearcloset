@@ -1,0 +1,1404 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ====================
+// ENUMS
+// ====================
+
+enum Role {
+  MEMBER
+  PARENT
+  MENTOR
+  CIO
+  PROGRAM_DIRECTOR
+  ADMIN
+  COMPLIANCE
+}
+
+enum AgeBandType {
+  JUNIOR_FOUNDATIONS    // 10-12
+  TEEN_SKILLS           // 13-15
+  LAUNCH                // 16-22
+  STEWARDSHIP_PRACTICUM // 23-30
+  LEADERSHIP            // 25-35
+}
+
+enum InviteStatus {
+  PENDING
+  ACCEPTED
+  EXPIRED
+  REVOKED
+}
+
+enum ContentStatus {
+  DRAFT
+  IN_REVIEW
+  APPROVED
+  PUBLISHED
+  ARCHIVED
+}
+
+enum ContentType {
+  GUIDE
+  VIDEO
+  WORKBOOK
+  WORKSHOP
+  QUIZ
+  EXERCISE
+  TEMPLATE
+  GLOSSARY
+  ARTICLE
+  COURSE
+  CHALLENGE
+}
+
+enum NotificationType {
+  SYSTEM
+  INVITE
+  SESSION
+  APPROVAL
+  FEEDBACK
+  MILESTONE
+  REMINDER
+  MESSAGE
+}
+
+enum ModerationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  FLAGGED
+}
+
+enum TradeStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  EXECUTED
+}
+
+enum SeedReviewStatus {
+  INTAKE
+  UNDER_REVIEW
+  FEEDBACK_PROVIDED
+  APPROVED
+  REJECTED
+}
+
+enum SessionStatus {
+  REQUESTED
+  SCHEDULED
+  COMPLETED
+  CANCELLED
+}
+
+enum VoteChoice {
+  FOR
+  AGAINST
+  ABSTAIN
+}
+
+// ====================
+// USER & AUTH
+// ====================
+
+model User {
+  id                 String   @id @default(cuid())
+  email              String   @unique
+  auth0Id            String?  @unique
+  firstName          String
+  lastName           String
+  dateOfBirth        DateTime
+  avatarUrl          String?
+  phone              String?
+  bio                String?
+  ageBandOverride    AgeBandType?
+  lastActivityAt     DateTime @default(now())
+  emailVerified      Boolean  @default(false)
+  isActive           Boolean  @default(true)
+  status             String   @default("ACTIVE")
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  // Gamification
+  xp                 Int      @default(0)
+  level              Int      @default(1)
+  streak             Int      @default(0)
+  longestStreak      Int      @default(0)
+  lastActivityDate   DateTime?
+  avatar             Json?    // Custom avatar configuration
+
+  // Relations
+  roles              UserRole[]
+  householdMemberships HouseholdMembership[]
+  invitesSent        Invite[] @relation("InviteSender")
+  invitesReceived    Invite[] @relation("InviteRecipient")
+  notifications      Notification[]
+
+  // Learning
+  quizAttempts       QuizAttempt[]
+  submissions        Submission[]
+  badges             UserBadge[]
+  certificates       Certificate[]
+  lessonProgress     LessonProgress[]
+
+  // Mentorship
+  mentorAssignmentsAsMentor MentorAssignment[] @relation("Mentor")
+  mentorAssignmentsAsMentee MentorAssignment[] @relation("Mentee")
+  sessionsAsMentor   MentorshipSession[] @relation("SessionMentor")
+  sessionsAsMentee   MentorshipSession[] @relation("SessionMentee")
+  sessionNotes       SessionNote[]
+  actionPlans        ActionPlan[]
+
+  // Community
+  cohortMemberships  CohortMembership[]
+  posts              CommunityPost[]
+  comments           Comment[]
+  moderationFlags    ModerationFlag[]
+  eventRsvps         RSVP[]
+  attendance         Attendance[]
+
+  // Stewardship
+  budgets            Budget[]
+  savingsGoals       SavingsGoal[]
+  wealthStories      WealthStory[]
+
+  // Career
+  careerPlans        CareerPlan[]
+  networkingRequestsSent NetworkingRequest[] @relation("RequestSender")
+  networkingRequestsReceived NetworkingRequest[] @relation("RequestRecipient")
+  seedSubmissions    SeedSubmission[]
+  seedReviews        SeedReview[]
+
+  // IC Practicum
+  portfolios         Portfolio[]
+  marketMemos        MarketMemo[]
+  rubricScores       RubricScore[]
+  tradeApprovals     TradeApproval[]
+
+  // Philanthropy
+  givingStrategies   GivingStrategy[]
+  grantProposals     GrantProposal[]
+  votes              Vote[]
+  impactNotes        ImpactNote[]
+
+  // Governance
+  governanceExercises GovernanceExercise[]
+
+  // Content
+  contentCreated     ContentItem[] @relation("ContentCreator")
+  contentApprovals   ContentApproval[]
+
+  // Audit
+  auditLogs          AuditLog[]
+  exportJobs         ExportJob[]
+
+  // Gamification
+  xpTransactions     XpTransaction[]
+  dailyChallenges    DailyChallengeCompletion[]
+  familyConnections  FamilyConnection[]
+  activityLogs       ActivityLog[]
+}
+
+model UserRole {
+  id        String   @id @default(cuid())
+  userId    String
+  role      Role
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, role])
+}
+
+// ====================
+// HOUSEHOLD
+// ====================
+
+model Household {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  members     HouseholdMembership[]
+  invites     Invite[]
+}
+
+model HouseholdMembership {
+  id           String   @id @default(cuid())
+  userId       String
+  householdId  String
+  isPrimary    Boolean  @default(false)
+  joinedAt     DateTime @default(now())
+
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  household    Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, householdId])
+}
+
+model Invite {
+  id            String       @id @default(cuid())
+  email         String
+  token         String       @unique
+  status        InviteStatus @default(PENDING)
+  roles         Role[]
+  householdId   String?
+  senderId      String
+  recipientId   String?
+  expiresAt     DateTime
+  acceptedAt    DateTime?
+  createdAt     DateTime     @default(now())
+
+  sender        User         @relation("InviteSender", fields: [senderId], references: [id])
+  recipient     User?        @relation("InviteRecipient", fields: [recipientId], references: [id])
+  household     Household?   @relation(fields: [householdId], references: [id])
+}
+
+// ====================
+// AGE BAND CONFIG
+// ====================
+
+model AgeBand {
+  id          String      @id @default(cuid())
+  type        AgeBandType @unique
+  name        String
+  description String?
+  minAge      Int
+  maxAge      Int
+  sortOrder   Int
+  isActive    Boolean     @default(true)
+
+  tracks      Track[]
+  modules     Module[]
+  contentItems ContentItem[]
+}
+
+// ====================
+// LEARNING CONTENT
+// ====================
+
+model Track {
+  id              String        @id @default(cuid())
+  slug            String        @unique
+  name            String
+  description     String
+  shortDescription String?
+  imageUrl        String?
+  sortOrder       Int           @default(0)
+  isPublished     Boolean       @default(false)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  ageBands        AgeBand[]
+  modules         Module[]
+  contentItems    ContentItem[]
+}
+
+model Module {
+  id              String        @id @default(cuid())
+  trackId         String
+  slug            String
+  name            String
+  description     String
+  shortDescription String?
+  imageUrl        String?
+  sortOrder       Int           @default(0)
+  isPublished     Boolean       @default(false)
+  prerequisites   String[]      // Module IDs
+  gatingRules     Json?         // { minQuizScore: 80, requiredLessons: [...] }
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  track           Track         @relation(fields: [trackId], references: [id], onDelete: Cascade)
+  ageBands        AgeBand[]
+  lessons         Lesson[]
+  exercises       Exercise[]
+  quizzes         Quiz[]
+  badges          Badge[]
+
+  @@unique([trackId, slug])
+}
+
+model Lesson {
+  id              String        @id @default(cuid())
+  moduleId        String
+  slug            String
+  title           String
+  description     String?
+  content         String        // Rich text/markdown
+  videoUrl        String?
+  duration        Int?          // minutes
+  sortOrder       Int           @default(0)
+  isPublished     Boolean       @default(false)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  module          Module        @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  progress        LessonProgress[]
+
+  @@unique([moduleId, slug])
+}
+
+model LessonProgress {
+  id              String        @id @default(cuid())
+  userId          String
+  lessonId        String
+  completedAt     DateTime?
+  timeSpent       Int           @default(0) // seconds
+  lastAccessedAt  DateTime      @default(now())
+
+  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lesson          Lesson        @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, lessonId])
+}
+
+model Exercise {
+  id              String        @id @default(cuid())
+  moduleId        String
+  slug            String
+  title           String
+  description     String
+  instructions    String
+  rubricCriteria  Json?
+  sortOrder       Int           @default(0)
+  isPublished     Boolean       @default(false)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  module          Module        @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  submissions     Submission[]
+
+  @@unique([moduleId, slug])
+}
+
+model Submission {
+  id              String        @id @default(cuid())
+  userId          String
+  exerciseId      String
+  content         String?
+  fileUrl         String?
+  fileName        String?
+  score           Float?
+  feedback        String?
+  reviewedBy      String?
+  reviewedAt      DateTime?
+  submittedAt     DateTime      @default(now())
+
+  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  exercise        Exercise      @relation(fields: [exerciseId], references: [id], onDelete: Cascade)
+}
+
+// ====================
+// QUIZZES
+// ====================
+
+model Quiz {
+  id              String        @id @default(cuid())
+  moduleId        String
+  title           String
+  description     String?
+  passingScore    Float         @default(70)
+  maxAttempts     Int           @default(3)
+  timeLimitMinutes Int?
+  shuffleQuestions Boolean      @default(true)
+  showCorrectAnswers Boolean    @default(true)
+  isPublished     Boolean       @default(false)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  module          Module        @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  questions       Question[]
+  attempts        QuizAttempt[]
+}
+
+model Question {
+  id              String        @id @default(cuid())
+  quizId          String
+  text            String
+  explanation     String?
+  sortOrder       Int           @default(0)
+  points          Float         @default(1)
+
+  quiz            Quiz          @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  choices         AnswerChoice[]
+}
+
+model AnswerChoice {
+  id              String        @id @default(cuid())
+  questionId      String
+  text            String
+  isCorrect       Boolean       @default(false)
+  sortOrder       Int           @default(0)
+
+  question        Question      @relation(fields: [questionId], references: [id], onDelete: Cascade)
+}
+
+model QuizAttempt {
+  id              String        @id @default(cuid())
+  userId          String
+  quizId          String
+  score           Float
+  passed          Boolean
+  answers         Json          // { questionId: selectedChoiceId }
+  startedAt       DateTime
+  completedAt     DateTime      @default(now())
+
+  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  quiz            Quiz          @relation(fields: [quizId], references: [id], onDelete: Cascade)
+}
+
+// ====================
+// BADGES & CERTIFICATES
+// ====================
+
+model Badge {
+  id              String        @id @default(cuid())
+  moduleId        String?
+  slug            String        @unique
+  name            String
+  description     String
+  imageUrl        String?
+  criteria        Json          // { type: "quiz_pass", quizId: "...", minScore: 80 }
+  sortOrder       Int           @default(0)
+  isActive        Boolean       @default(true)
+  createdAt       DateTime      @default(now())
+
+  module          Module?       @relation(fields: [moduleId], references: [id])
+  userBadges      UserBadge[]
+}
+
+model UserBadge {
+  id              String        @id @default(cuid())
+  userId          String
+  badgeId         String
+  awardedAt       DateTime      @default(now())
+
+  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  badge           Badge         @relation(fields: [badgeId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, badgeId])
+}
+
+model Certificate {
+  id              String        @id @default(cuid())
+  userId          String
+  trackId         String?
+  moduleId        String?
+  title           String
+  description     String?
+  issuedAt        DateTime      @default(now())
+  certificateUrl  String?
+
+  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// ====================
+// MENTORSHIP
+// ====================
+
+model MentorAssignment {
+  id              String        @id @default(cuid())
+  mentorId        String
+  menteeId        String
+  assignedBy      String?
+  startDate       DateTime      @default(now())
+  endDate         DateTime?
+  isActive        Boolean       @default(true)
+  notes           String?
+  createdAt       DateTime      @default(now())
+
+  mentor          User          @relation("Mentor", fields: [mentorId], references: [id])
+  mentee          User          @relation("Mentee", fields: [menteeId], references: [id])
+  sessions        MentorshipSession[]
+  actionPlans     ActionPlan[]
+}
+
+model MentorshipSession {
+  id              String        @id @default(cuid())
+  assignmentId    String?
+  mentorId        String
+  menteeId        String
+  status          SessionStatus @default(REQUESTED)
+  scheduledAt     DateTime?
+  duration        Int?          // minutes
+  location        String?
+  calendarLink    String?
+  agenda          String?
+  summary         String?       // Shared summary
+  completedAt     DateTime?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  assignment      MentorAssignment? @relation(fields: [assignmentId], references: [id])
+  mentor          User          @relation("SessionMentor", fields: [mentorId], references: [id])
+  mentee          User          @relation("SessionMentee", fields: [menteeId], references: [id])
+  notes           SessionNote[]
+}
+
+model SessionNote {
+  id              String        @id @default(cuid())
+  sessionId       String
+  authorId        String
+  content         String
+  isPrivate       Boolean       @default(true) // If true, only author sees it
+  isMentorPrivate Boolean       @default(false) // Mentor-only note
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  session         MentorshipSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  author          User          @relation(fields: [authorId], references: [id])
+}
+
+model ActionPlan {
+  id              String        @id @default(cuid())
+  assignmentId    String?
+  userId          String
+  title           String
+  description     String?
+  dueDate         DateTime?
+  isCompleted     Boolean       @default(false)
+  completedAt     DateTime?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  assignment      MentorAssignment? @relation(fields: [assignmentId], references: [id])
+  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  reminders       Reminder[]
+}
+
+model Reminder {
+  id              String        @id @default(cuid())
+  actionPlanId    String
+  remindAt        DateTime
+  isSent          Boolean       @default(false)
+  sentAt          DateTime?
+
+  actionPlan      ActionPlan    @relation(fields: [actionPlanId], references: [id], onDelete: Cascade)
+}
+
+// ====================
+// COHORTS & COMMUNITY
+// ====================
+
+model Cohort {
+  id              String        @id @default(cuid())
+  slug            String        @unique
+  name            String
+  description     String?
+  ageBandType     AgeBandType?
+  trackId         String?
+  startDate       DateTime?
+  endDate         DateTime?
+  maxMembers      Int?
+  isActive        Boolean       @default(true)
+  allowAnonymous  Boolean       @default(false)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  memberships     CohortMembership[]
+  posts           CommunityPost[]
+  events          Event[]
+  challenges      CohortChallenge[]
+}
+
+model CohortMembership {
+  id              String        @id @default(cuid())
+  userId          String
+  cohortId        String
+  joinedAt        DateTime      @default(now())
+  isAdmin         Boolean       @default(false)
+
+  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  cohort          Cohort        @relation(fields: [cohortId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, cohortId])
+}
+
+model CohortChallenge {
+  id              String        @id @default(cuid())
+  cohortId        String
+  title           String
+  description     String
+  startDate       DateTime
+  endDate         DateTime
+  criteria        Json?
+  isActive        Boolean       @default(true)
+  createdAt       DateTime      @default(now())
+
+  cohort          Cohort        @relation(fields: [cohortId], references: [id], onDelete: Cascade)
+}
+
+model Event {
+  id              String        @id @default(cuid())
+  cohortId        String?
+  title           String
+  description     String?
+  startTime       DateTime
+  endTime         DateTime?
+  location        String?
+  virtualLink     String?
+  maxAttendees    Int?
+  isPublic        Boolean       @default(false)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  cohort          Cohort?       @relation(fields: [cohortId], references: [id])
+  rsvps           RSVP[]
+  attendance      Attendance[]
+}
+
+model RSVP {
+  id              String        @id @default(cuid())
+  eventId         String
+  userId          String
+  response        String        // "yes", "no", "maybe"
+  createdAt       DateTime      @default(now())
+
+  event           Event         @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([eventId, userId])
+}
+
+model Attendance {
+  id              String        @id @default(cuid())
+  eventId         String
+  userId          String
+  checkedInAt     DateTime      @default(now())
+  checkedInBy     String?
+
+  event           Event         @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([eventId, userId])
+}
+
+model CommunityPost {
+  id              String           @id @default(cuid())
+  cohortId        String
+  authorId        String
+  title           String?
+  content         String
+  isAnonymous     Boolean          @default(false)
+  isPinned        Boolean          @default(false)
+  status          ModerationStatus @default(APPROVED)
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  cohort          Cohort           @relation(fields: [cohortId], references: [id], onDelete: Cascade)
+  author          User             @relation(fields: [authorId], references: [id])
+  comments        Comment[]
+  flags           ModerationFlag[]
+}
+
+model Comment {
+  id              String           @id @default(cuid())
+  postId          String
+  authorId        String
+  parentId        String?          // For nested comments
+  content         String
+  isAnonymous     Boolean          @default(false)
+  status          ModerationStatus @default(APPROVED)
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  post            CommunityPost    @relation(fields: [postId], references: [id], onDelete: Cascade)
+  author          User             @relation(fields: [authorId], references: [id])
+  parent          Comment?         @relation("CommentReplies", fields: [parentId], references: [id])
+  replies         Comment[]        @relation("CommentReplies")
+  flags           ModerationFlag[]
+}
+
+model ModerationFlag {
+  id              String           @id @default(cuid())
+  postId          String?
+  commentId       String?
+  flaggedBy       String
+  reason          String
+  status          ModerationStatus @default(PENDING)
+  reviewedBy      String?
+  reviewedAt      DateTime?
+  reviewNotes     String?
+  createdAt       DateTime         @default(now())
+
+  post            CommunityPost?   @relation(fields: [postId], references: [id], onDelete: Cascade)
+  comment         Comment?         @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  user            User             @relation(fields: [flaggedBy], references: [id])
+}
+
+// ====================
+// STEWARDSHIP LAB
+// ====================
+
+model Budget {
+  id              String        @id @default(cuid())
+  userId          String
+  name            String
+  period          String        // "monthly", "quarterly", "annual"
+  totalAmount     Float
+  categories      Json          // [{ name, allocated, spent }]
+  isActive        Boolean       @default(true)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model SavingsGoal {
+  id              String        @id @default(cuid())
+  userId          String
+  name            String
+  targetAmount    Float
+  currentAmount   Float         @default(0)
+  targetDate      DateTime?
+  notes           String?
+  isCompleted     Boolean       @default(false)
+  completedAt     DateTime?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  habits          SavingsHabit[]
+}
+
+model SavingsHabit {
+  id              String        @id @default(cuid())
+  goalId          String
+  name            String
+  frequency       String        // "daily", "weekly", "monthly"
+  amount          Float?
+  lastCompletedAt DateTime?
+  streak          Int           @default(0)
+
+  goal            SavingsGoal   @relation(fields: [goalId], references: [id], onDelete: Cascade)
+}
+
+model WealthStory {
+  id              String        @id @default(cuid())
+  userId          String
+  title           String
+  content         String
+  isSharedWithFamily Boolean    @default(false)
+  sharedAt        DateTime?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// ====================
+// CAREER & IDENTITY
+// ====================
+
+model CareerPlan {
+  id              String        @id @default(cuid())
+  userId          String
+  title           String
+  currentStage    String?
+  goals           Json?         // Short and long term goals
+  skills          Json?         // Skills to develop
+  timeline        Json?         // 12-month plan
+  mentorReviewStatus String?    // "pending", "reviewed", "approved"
+  mentorFeedback  String?
+  reviewedBy      String?
+  reviewedAt      DateTime?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model NetworkingRequest {
+  id              String        @id @default(cuid())
+  senderId        String
+  recipientId     String?
+  targetName      String        // Name of person they want intro to
+  targetCompany   String?
+  purpose         String
+  status          String        @default("pending") // "pending", "approved", "connected", "declined"
+  notes           String?
+  approvedBy      String?
+  approvedAt      DateTime?
+  createdAt       DateTime      @default(now())
+
+  sender          User          @relation("RequestSender", fields: [senderId], references: [id])
+  recipient       User?         @relation("RequestRecipient", fields: [recipientId], references: [id])
+}
+
+model SeedSubmission {
+  id              String           @id @default(cuid())
+  userId          String
+  title           String
+  description     String
+  businessPlan    String?
+  marketAnalysis  String?
+  financialProjections Json?
+  teamInfo        String?
+  attachmentUrl   String?
+  status          SeedReviewStatus @default(INTAKE)
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  reviews         SeedReview[]
+}
+
+model SeedReview {
+  id              String        @id @default(cuid())
+  submissionId    String
+  reviewerId      String
+  score           Float?
+  feedback        String
+  recommendation  String?       // "proceed", "revise", "decline"
+  createdAt       DateTime      @default(now())
+
+  submission      SeedSubmission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  reviewer        User          @relation(fields: [reviewerId], references: [id])
+}
+
+// ====================
+// IC PRACTICUM
+// ====================
+
+model Portfolio {
+  id              String        @id @default(cuid())
+  userId          String
+  name            String
+  type            String        // "paper", "real_capital"
+  initialCapital  Float
+  currentValue    Float
+  constraints     Json?         // Risk limits, concentration limits, etc.
+  isActive        Boolean       @default(true)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  holdings        Holding[]
+  tradeRequests   TradeRequest[]
+  snapshots       PerformanceSnapshot[]
+}
+
+model Holding {
+  id              String        @id @default(cuid())
+  portfolioId     String
+  symbol          String
+  name            String
+  quantity        Float
+  averageCost     Float
+  currentPrice    Float?
+  assetClass      String?
+  sector          String?
+  updatedAt       DateTime      @updatedAt
+
+  portfolio       Portfolio     @relation(fields: [portfolioId], references: [id], onDelete: Cascade)
+
+  @@unique([portfolioId, symbol])
+}
+
+model TradeRequest {
+  id              String        @id @default(cuid())
+  portfolioId     String
+  userId          String
+  action          String        // "buy", "sell"
+  symbol          String
+  quantity        Float
+  price           Float?
+  thesis          String        // Investment thesis required
+  riskAnalysis    String?
+  status          TradeStatus   @default(PENDING)
+  executedAt      DateTime?
+  executedPrice   Float?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  portfolio       Portfolio     @relation(fields: [portfolioId], references: [id], onDelete: Cascade)
+  approvals       TradeApproval[]
+}
+
+model TradeApproval {
+  id              String        @id @default(cuid())
+  tradeRequestId  String
+  approverId      String
+  decision        String        // "approved", "rejected"
+  comments        String?
+  createdAt       DateTime      @default(now())
+
+  tradeRequest    TradeRequest  @relation(fields: [tradeRequestId], references: [id], onDelete: Cascade)
+  approver        User          @relation(fields: [approverId], references: [id])
+}
+
+model Constraint {
+  id              String        @id @default(cuid())
+  name            String
+  type            String        // "risk", "concentration", "liquidity", "sector"
+  rule            Json          // { maxPct: 10, metric: "single_position" }
+  isGlobal        Boolean       @default(false)
+  portfolioId     String?
+  isActive        Boolean       @default(true)
+  createdAt       DateTime      @default(now())
+}
+
+model PerformanceSnapshot {
+  id              String        @id @default(cuid())
+  portfolioId     String
+  date            DateTime      @default(now())
+  totalValue      Float
+  dayChange       Float?
+  dayChangePct    Float?
+  totalReturn     Float?
+  totalReturnPct  Float?
+  holdings        Json          // Snapshot of all holdings
+
+  portfolio       Portfolio     @relation(fields: [portfolioId], references: [id], onDelete: Cascade)
+}
+
+model MarketMemo {
+  id              String        @id @default(cuid())
+  userId          String
+  title           String
+  content         String
+  thesis          String?
+  recommendations Json?
+  status          String        @default("draft") // "draft", "submitted", "reviewed"
+  submittedAt     DateTime?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  scores          RubricScore[]
+}
+
+model Rubric {
+  id              String        @id @default(cuid())
+  name            String
+  type            String        // "market_memo", "career_plan", "giving_strategy", "governance"
+  criteria        Json          // [{ name, description, maxScore, weight }]
+  isActive        Boolean       @default(true)
+  createdAt       DateTime      @default(now())
+}
+
+model RubricScore {
+  id              String        @id @default(cuid())
+  rubricId        String
+  memoId          String?
+  careerPlanId    String?
+  givingStrategyId String?
+  governanceExerciseId String?
+  scorerId        String
+  scores          Json          // { criteriaId: score }
+  totalScore      Float
+  feedback        String?
+  createdAt       DateTime      @default(now())
+
+  memo            MarketMemo?   @relation(fields: [memoId], references: [id])
+  scorer          User          @relation(fields: [scorerId], references: [id])
+}
+
+// ====================
+// PHILANTHROPY
+// ====================
+
+model GivingStrategy {
+  id              String        @id @default(cuid())
+  userId          String
+  title           String
+  values          Json?         // Core values
+  causes          Json?         // Priority causes
+  thesis          String?
+  grantCriteria   Json?
+  annualBudget    Float?
+  status          String        @default("draft")
+  mentorFeedback  String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  grantProposals  GrantProposal[]
+}
+
+model GrantProposal {
+  id              String        @id @default(cuid())
+  strategyId      String?
+  userId          String
+  organizationName String
+  description     String
+  amount          Float
+  purpose         String
+  expectedImpact  String?
+  status          String        @default("draft") // "draft", "submitted", "under_review", "approved", "funded", "declined"
+  votingRequired  Boolean       @default(false)
+  submittedAt     DateTime?
+  fundedAt        DateTime?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  strategy        GivingStrategy? @relation(fields: [strategyId], references: [id])
+  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  votes           Vote[]
+  impactNotes     ImpactNote[]
+}
+
+model Vote {
+  id              String        @id @default(cuid())
+  proposalId      String
+  userId          String
+  choice          VoteChoice
+  comments        String?
+  createdAt       DateTime      @default(now())
+
+  proposal        GrantProposal @relation(fields: [proposalId], references: [id], onDelete: Cascade)
+  user            User          @relation(fields: [userId], references: [id])
+
+  @@unique([proposalId, userId])
+}
+
+model ImpactNote {
+  id              String        @id @default(cuid())
+  proposalId      String
+  userId          String
+  content         String
+  metrics         Json?
+  attachmentUrl   String?
+  createdAt       DateTime      @default(now())
+
+  proposal        GrantProposal @relation(fields: [proposalId], references: [id], onDelete: Cascade)
+  user            User          @relation(fields: [userId], references: [id])
+}
+
+// ====================
+// FAMILY GOVERNANCE
+// ====================
+
+model GovernanceExercise {
+  id              String        @id @default(cuid())
+  userId          String
+  type            String        // "conflict_resolution", "meeting_simulation", "scenario"
+  title           String
+  responses       Json
+  feedback        String?
+  mentorSignoff   Boolean       @default(false)
+  signedOffBy     String?
+  signedOffAt     DateTime?
+  submittedAt     DateTime?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// ====================
+// CONTENT MANAGEMENT
+// ====================
+
+model ContentItem {
+  id              String        @id @default(cuid())
+  slug            String        @unique
+  title           String
+  type            ContentType
+  status          ContentStatus @default(DRAFT)
+  summary         String?
+  content         String        // Rich text/HTML/markdown
+  metadata        Json?         // Flexible metadata
+  thumbnailUrl    String?
+  videoUrl        String?
+  attachmentUrl   String?
+  duration        Int?          // minutes for video/workshop
+  sortOrder       Int           @default(0)
+  creatorId       String
+  publishedAt     DateTime?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  creator         User          @relation("ContentCreator", fields: [creatorId], references: [id])
+  ageBands        AgeBand[]
+  tracks          Track[]
+  versions        ContentVersion[]
+  approvals       ContentApproval[]
+  disclosures     Disclosure[]
+}
+
+model ContentVersion {
+  id              String        @id @default(cuid())
+  contentItemId   String
+  version         Int
+  title           String
+  content         String
+  metadata        Json?
+  createdAt       DateTime      @default(now())
+  createdBy       String?
+  changeNotes     String?
+
+  contentItem     ContentItem   @relation(fields: [contentItemId], references: [id], onDelete: Cascade)
+}
+
+model ContentApproval {
+  id              String        @id @default(cuid())
+  contentItemId   String
+  approverId      String
+  fromStatus      ContentStatus
+  toStatus        ContentStatus
+  comments        String?
+  createdAt       DateTime      @default(now())
+
+  contentItem     ContentItem   @relation(fields: [contentItemId], references: [id], onDelete: Cascade)
+  approver        User          @relation(fields: [approverId], references: [id])
+}
+
+model Disclosure {
+  id              String        @id @default(cuid())
+  contentItemId   String
+  type            String        // "disclaimer", "risk_warning", "educational_only"
+  text            String
+  isRequired      Boolean       @default(true)
+
+  contentItem     ContentItem   @relation(fields: [contentItemId], references: [id], onDelete: Cascade)
+}
+
+// ====================
+// GLOSSARY & TEMPLATES
+// ====================
+
+model GlossaryTerm {
+  id              String        @id @default(cuid())
+  term            String        @unique
+  definition      String
+  category        String?
+  relatedTerms    String[]
+  isPublished     Boolean       @default(true)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+}
+
+model Template {
+  id              String        @id @default(cuid())
+  slug            String        @unique
+  name            String
+  type            String        // "ips", "spending_policy", "meeting_agenda", etc.
+  description     String?
+  content         String
+  isPublished     Boolean       @default(true)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+}
+
+// ====================
+// NOTIFICATIONS & AUDIT
+// ====================
+
+model Notification {
+  id              String           @id @default(cuid())
+  userId          String
+  type            NotificationType
+  title           String
+  message         String
+  link            String?
+  isRead          Boolean          @default(false)
+  readAt          DateTime?
+  createdAt       DateTime         @default(now())
+
+  user            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model AuditLog {
+  id              String        @id @default(cuid())
+  userId          String?
+  action          String
+  entityType      String
+  entityId        String?
+  oldValues       Json?
+  newValues       Json?
+  ipAddress       String?
+  userAgent       String?
+  metadata        Json?
+  createdAt       DateTime      @default(now())
+
+  user            User?         @relation(fields: [userId], references: [id])
+
+  @@index([entityType, entityId])
+  @@index([userId])
+  @@index([createdAt])
+}
+
+model ExportJob {
+  id              String        @id @default(cuid())
+  userId          String
+  type            String        // "member_progress", "household_progress", "trade_audit", etc.
+  status          String        @default("pending") // "pending", "processing", "completed", "failed"
+  filters         Json?
+  fileUrl         String?
+  error           String?
+  startedAt       DateTime?
+  completedAt     DateTime?
+  createdAt       DateTime      @default(now())
+
+  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// ====================
+// IC MEETING
+// ====================
+
+model ICMeeting {
+  id              String        @id @default(cuid())
+  title           String
+  scheduledAt     DateTime
+  agenda          String?
+  preReadItems    Json?         // [{ title, url, required }]
+  minutes         String?
+  attendees       String[]
+  status          String        @default("scheduled") // "scheduled", "in_progress", "completed"
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+}
+
+// ====================
+// GAMIFICATION
+// ====================
+
+model XpTransaction {
+  id              String        @id @default(cuid())
+  userId          String
+  amount          Int
+  reason          String
+  source          String        // "lesson", "quiz", "badge", "challenge", "streak", "system"
+  balanceAfter    Int
+  metadata        Json?
+  createdAt       DateTime      @default(now())
+
+  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([createdAt])
+}
+
+model DailyChallengeCompletion {
+  id              String        @id @default(cuid())
+  userId          String
+  challengeId     String
+  xpEarned        Int           @default(0)
+  completedAt     DateTime      @default(now())
+
+  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, challengeId, completedAt])
+  @@index([userId])
+  @@index([completedAt])
+}
+
+model FamilyConnection {
+  id              String        @id @default(cuid())
+  userId          String
+  connectedUserId String
+  relationship    String        // "parent", "child", "sibling", "mentor"
+  status          String        @default("ACTIVE")
+  createdAt       DateTime      @default(now())
+
+  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, connectedUserId])
+}
+
+model ActivityLog {
+  id              String        @id @default(cuid())
+  userId          String
+  action          String        // "completed_lesson", "earned_badge", "passed_quiz", etc.
+  entityType      String
+  entityId        String?
+  metadata        Json?
+  xpEarned        Int           @default(0)
+  isPublic        Boolean       @default(true)
+  createdAt       DateTime      @default(now())
+
+  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([createdAt])
+}
+
+model FamilyChallenge {
+  id              String        @id @default(cuid())
+  householdId     String
+  title           String
+  description     String
+  startDate       DateTime
+  endDate         DateTime
+  targetProgress  Int
+  currentProgress Int           @default(0)
+  xpReward        Int
+  isActive        Boolean       @default(true)
+  completedAt     DateTime?
+  createdAt       DateTime      @default(now())
+
+  participants    FamilyChallengeParticipant[]
+}
+
+model FamilyChallengeParticipant {
+  id              String        @id @default(cuid())
+  challengeId     String
+  userId          String
+  progress        Int           @default(0)
+  joinedAt        DateTime      @default(now())
+
+  challenge       FamilyChallenge @relation(fields: [challengeId], references: [id], onDelete: Cascade)
+
+  @@unique([challengeId, userId])
+}
+
+model UserGoal {
+  id              String        @id @default(cuid())
+  userId          String
+  type            String        // "lessons_per_week", "quiz_score", "streak_days"
+  target          Int
+  current         Int           @default(0)
+  period          String        // "weekly", "monthly", "custom"
+  startDate       DateTime      @default(now())
+  endDate         DateTime?
+  isActive        Boolean       @default(true)
+  completedAt     DateTime?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  @@index([userId])
+}
+
+model OnboardingProgress {
+  id              String        @id @default(cuid())
+  userId          String        @unique
+  completedSteps  String[]
+  nickname        String?
+  interests       String[]
+  goals           String[]
+  isComplete      Boolean       @default(false)
+  completedAt     DateTime?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+}
+
+model Resource {
+  id              String        @id @default(cuid())
+  slug            String        @unique
+  title           String
+  description     String?
+  type            String        // "video", "article", "guide", "template", "tool"
+  url             String?
+  content         String?
+  thumbnailUrl    String?
+  minAgeBand      AgeBandType?
+  maxAgeBand      AgeBandType?
+  category        String?
+  tags            String[]
+  isPublished     Boolean       @default(false)
+  viewCount       Int           @default(0)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+}

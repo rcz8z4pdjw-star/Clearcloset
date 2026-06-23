@@ -1,0 +1,270 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 40 33% 96%;
+    --foreground: 215 50% 23%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 215 50% 23%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 215 50% 23%;
+
+    --primary: 215 50% 23%;
+    --primary-foreground: 40 33% 96%;
+
+    --secondary: 42 58% 58%;
+    --secondary-foreground: 215 50% 23%;
+
+    --muted: 210 40% 96%;
+    --muted-foreground: 215 16% 47%;
+
+    --accent: 42 58% 58%;
+    --accent-foreground: 215 50% 23%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 214 32% 91%;
+    --input: 214 32% 91%;
+    --ring: 215 50% 23%;
+
+    --radius: 0.5rem;
+  }
+
+  .dark {
+    --background: 215 50% 10%;
+    --foreground: 40 33% 96%;
+
+    --card: 215 50% 15%;
+    --card-foreground: 40 33% 96%;
+
+    --popover: 215 50% 15%;
+    --popover-foreground: 40 33% 96%;
+
+    --primary: 42 58% 58%;
+    --primary-foreground: 215 50% 10%;
+
+    --secondary: 215 50% 23%;
+    --secondary-foreground: 40 33% 96%;
+
+    --muted: 215 40% 20%;
+    --muted-foreground: 215 16% 65%;
+
+    --accent: 42 58% 58%;
+    --accent-foreground: 215 50% 10%;
+
+    --destructive: 0 62% 50%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 215 40% 25%;
+    --input: 215 40% 25%;
+    --ring: 42 58% 58%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+}
+
+@layer components {
+  .prose-ascent {
+    @apply prose prose-slate max-w-none;
+    @apply prose-headings:text-ascent-navy prose-headings:font-serif;
+    @apply prose-p:text-ascent-slate prose-p:leading-relaxed;
+    @apply prose-a:text-ascent-navy prose-a:underline-offset-4 hover:prose-a:text-ascent-gold;
+    @apply prose-strong:text-ascent-navy prose-strong:font-semibold;
+    @apply prose-blockquote:border-l-ascent-gold prose-blockquote:bg-ascent-cream/50 prose-blockquote:py-2 prose-blockquote:px-4;
+    @apply prose-code:bg-muted prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded prose-code:text-sm;
+    @apply prose-ul:list-disc prose-ol:list-decimal;
+    @apply prose-li:text-ascent-slate;
+  }
+
+  .progress-ring {
+    transform: rotate(-90deg);
+  }
+
+  .progress-ring__circle {
+    stroke-dasharray: 0 100;
+    transition: stroke-dasharray 0.5s ease-in-out;
+  }
+
+  .card-premium {
+    @apply bg-white rounded-lg border border-border shadow-sm;
+    @apply hover:shadow-md transition-shadow duration-200;
+  }
+
+  .btn-premium {
+    @apply inline-flex items-center justify-center rounded-md text-sm font-medium;
+    @apply ring-offset-background transition-colors;
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2;
+    @apply disabled:pointer-events-none disabled:opacity-50;
+  }
+
+  .input-premium {
+    @apply flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm;
+    @apply ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium;
+    @apply placeholder:text-muted-foreground;
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2;
+    @apply disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
+  .sidebar-link {
+    @apply flex items-center gap-3 rounded-lg px-3 py-2 text-muted-foreground;
+    @apply transition-all hover:text-foreground hover:bg-muted;
+  }
+
+  .sidebar-link-active {
+    @apply bg-muted text-foreground font-medium;
+  }
+
+  .stat-card {
+    @apply p-6 bg-white rounded-lg border shadow-sm;
+  }
+
+  .stat-value {
+    @apply text-3xl font-bold text-ascent-navy;
+  }
+
+  .stat-label {
+    @apply text-sm text-muted-foreground mt-1;
+  }
+
+  .badge-premium {
+    @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium;
+  }
+}
+
+@layer utilities {
+  .animate-fade-in {
+    animation: fade-in 0.3s ease-out;
+  }
+
+  .animate-slide-in {
+    animation: slide-in 0.4s ease-out;
+  }
+
+  .scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--muted)) transparent;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background: hsl(var(--muted));
+    border-radius: 3px;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--muted-foreground));
+  }
+
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  .gradient-gold {
+    background: linear-gradient(135deg, #d4a853 0%, #f5d89a 50%, #d4a853 100%);
+  }
+
+  .gradient-navy {
+    background: linear-gradient(135deg, #1a365d 0%, #2d4a7c 100%);
+  }
+
+  .glass-effect {
+    backdrop-filter: blur(8px);
+    background: rgba(255, 255, 255, 0.8);
+  }
+}
+
+/* Rich text editor styles */
+.rich-text-content h1 {
+  @apply text-2xl font-bold text-ascent-navy mb-4 mt-8 first:mt-0;
+}
+
+.rich-text-content h2 {
+  @apply text-xl font-semibold text-ascent-navy mb-3 mt-6;
+}
+
+.rich-text-content h3 {
+  @apply text-lg font-semibold text-ascent-navy mb-2 mt-4;
+}
+
+.rich-text-content p {
+  @apply mb-4 leading-relaxed;
+}
+
+.rich-text-content ul {
+  @apply list-disc pl-6 mb-4 space-y-2;
+}
+
+.rich-text-content ol {
+  @apply list-decimal pl-6 mb-4 space-y-2;
+}
+
+.rich-text-content blockquote {
+  @apply border-l-4 border-ascent-gold bg-ascent-cream/50 px-4 py-3 italic my-4;
+}
+
+.rich-text-content code {
+  @apply bg-muted px-1.5 py-0.5 rounded text-sm font-mono;
+}
+
+.rich-text-content pre {
+  @apply bg-muted p-4 rounded-lg overflow-x-auto my-4;
+}
+
+.rich-text-content pre code {
+  @apply bg-transparent p-0;
+}
+
+.rich-text-content a {
+  @apply text-ascent-navy underline underline-offset-4 hover:text-ascent-gold transition-colors;
+}
+
+.rich-text-content img {
+  @apply rounded-lg my-4 max-w-full h-auto;
+}
+
+.rich-text-content table {
+  @apply w-full border-collapse my-4;
+}
+
+.rich-text-content th,
+.rich-text-content td {
+  @apply border border-border px-4 py-2 text-left;
+}
+
+.rich-text-content th {
+  @apply bg-muted font-semibold;
+}
+
+/* Print styles */
+@media print {
+  .no-print {
+    display: none !important;
+  }
+
+  body {
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+}
